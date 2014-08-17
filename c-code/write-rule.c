@@ -1,169 +1,131 @@
 /*
- * prints all the rules from all 
- * the chains
- * install iptables-dev package with dependencies (prefer synaptic package manger) :)
+ * code to insert :-
+ * iptables -A INPUT -s 156.145.1.3 -d 168.220.1.9 -i eth0 -p tcp --sport 0:80 --dport 0:51201 -m limit --limit 2000/s --limit-burst 10 -m physdev-in eth0 -j ACCEPT
  */
 
-#include <getopt.h>
 #include <sys/errno.h>
 #include <stdio.h>
-#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
-#include <dlfcn.h>
-#include <time.h>
 #include <libiptc/libiptc.h>
-
-#define IP_PARTS_NATIVE(n)      \
-(unsigned int)((n)>>24)&0xFF,   \
-(unsigned int)((n)>>16)&0xFF,   \
-(unsigned int)((n)>>8)&0xFF,    \
-(unsigned int)((n)&0xFF)
-
-
-#define IP_PARTS(n) IP_PARTS_NATIVE(ntohl(n))
-
-//print interface
-static void print_iface(char letter, const char *iface, const unsigned char *mask, int invert)
-{
-    unsigned int i;
-
-    if (mask[0] == 0)
-        return;
-
-    printf("-%c %s", letter, invert ? "! " : "");
-
-    for (i = 0; i < IFNAMSIZ; i++) { //IFNAMSIZ is max size of buffer required to represent an interface
-        if (mask[i] != 0) {
-            if (iface[i] != '\0')
-                printf("%c", iface[i]);
-        } else {
-            /* we can access iface[i-1] here, because
-             * a few lines above we make sure that mask[0] != 0 */
-            if (iface[i-1] != '\0')
-                printf("+");
-            break;
-        }
-    }
-
-    printf(" ");
-}
-
-
-struct pprot {
-    char *name;
-    u_int8_t num;
-};
-
-static const struct pprot chain_protos[] = {
-    { "tcp", IPPROTO_TCP },
-    { "udp", IPPROTO_UDP },
-    { "icmp", IPPROTO_ICMP },
-    { "esp", IPPROTO_ESP },
-    { "ah", IPPROTO_AH },
-};
-
-//print protocol
-static void print_proto(u_int16_t proto, int invert)
-{
-    if (proto) {
-        unsigned int i;
-        const char *invertstr = invert ? "! " : "";
-
-        for (i = 0; i < sizeof(chain_protos)/sizeof(struct pprot); i++)
-            if (chain_protos[i].num == proto) {
-                printf("-p %s%s ",invertstr, chain_protos[i].name);
-                return;
-            }
-
-        printf("-p %s%u ", invertstr, proto);
-    }
-}
-
-
-//print match segment
-static int print_match(const struct ipt_entry_match *e, const struct ipt_ip *ip)
-{
-        printf("-m %s ", e->u.user.name);
-    return 0;
-}
-
-/* print a given ip including mask if neccessary */
-static void print_ip(char *prefix, u_int32_t ip, u_int32_t mask, int invert)
-{
-    if (!mask && !ip)
-        return;
-
-    printf("%s %s%u.%u.%u.%u", prefix, invert ? "! " : "", IP_PARTS(ip));
-
-    if (mask != 0xffffffff)
-        printf("/%u.%u.%u.%u ", IP_PARTS(mask));
-    else
-        printf(" ");
-}
-
-static void print_rule(const struct ipt_entry *e,struct xtc_handle *h, const char *chain, int counters)
-{
-    struct ipt_entry_target *t;
-    const char *target_name;
-
-    /* print counters */
-    if (counters)
-        printf("[%llu:%llu] ", e->counters.pcnt, e->counters.bcnt);
-
-    /* print chain name */
-    printf("-A %s ", chain);
-
-    /* Print IP part. */
-    print_ip("-s", e->ip.src.s_addr,e->ip.smsk.s_addr, e->ip.invflags & IPT_INV_SRCIP);
-
-    print_ip("-d", e->ip.dst.s_addr, e->ip.dmsk.s_addr, e->ip.invflags & IPT_INV_DSTIP);
-
-    print_iface('i', e->ip.iniface, e->ip.iniface_mask, e->ip.invflags & IPT_INV_VIA_IN);
-
-    print_iface('o', e->ip.outiface, e->ip.outiface_mask,e->ip.invflags & IPT_INV_VIA_OUT);
-
-    print_proto(e->ip.proto, e->ip.invflags & IPT_INV_PROTO);
-
-    if (e->ip.flags & IPT_F_FRAG)
-        printf("%s-f ", e->ip.invflags & IPT_INV_FRAG ? "! " : "");
-
-    /* Print matchinfo part */
-    if (e->target_offset) {
-        IPT_MATCH_ITERATE(e, print_match, &e->ip);
-    }
-
-    /* Print target name */
-    target_name = iptc_get_target(e, h);
-    if (target_name && (*target_name != '\0'))
-        printf("-j %s ", target_name);
-
-    /* Print targinfo part */
-    t = ipt_get_target((struct ipt_entry *)e);
-    printf("\n");
-}
+#include "linux/netfilter/xt_limit.h"
+#include "linux/netfilter/xt_physdev.h"
+#include <netinet/in.h>
 
 int main(void)
 {
-  /* Use always this part for your programs .... From here ... **** */
-    struct xtc_handle *h;
-    const struct ipt_entry *e;
-    const char *chain = NULL;
-    const char *tablename = "filter";
-    const int counters = 1;
+        struct xtc_handle *h;
+        const ipt_chainlabel chain = "INPUT";
+        const char * tablename = "filter";
 
-    h = iptc_init(tablename);
-    if(!h) {
-        printf("Error initializing : %s \n", iptc_strerror(errno));
-        exit(errno);
-    }
+        struct ipt_entry * e;
+        struct ipt_entry_match * match_proto, * match_limit, * match_physdev;
+        struct xt_standard_target * target;
+        struct ipt_tcp * tcpinfo;
+        struct xt_rateinfo * rateinfo;
+        struct xt_physdev_info * physdevinfo;
+        unsigned int size_ipt_entry, size_ipt_entry_match, size_ipt_entry_target, size_ipt_tcp, size_rateinfo, size_physdevinfo, total_length;
 
-    for (chain = iptc_first_chain(h); chain; chain = iptc_next_chain(h))  {
-    	printf("%s\n", chain);
-    	for (e = iptc_first_rule(chain, h); e; e = iptc_next_rule(e, h))  {
-            print_rule(e, h, chain, counters);
+        size_ipt_entry = XT_ALIGN(sizeof(struct ipt_entry));
+        size_ipt_entry_match = XT_ALIGN(sizeof(struct ipt_entry_match));
+        size_ipt_entry_target = XT_ALIGN(sizeof(struct xt_standard_target));
+        size_ipt_tcp = XT_ALIGN(sizeof(struct ipt_tcp));
+        size_rateinfo = XT_ALIGN(sizeof(struct xt_rateinfo));
+        size_physdevinfo = XT_ALIGN(sizeof(struct xt_physdev_info));
+        total_length =  size_ipt_entry + size_ipt_entry_match * 3 + size_ipt_entry_target + size_ipt_tcp + size_rateinfo + size_physdevinfo;
+
+
+        //memory allocation for all structs that represent the netfilter rule we want to insert
+        e = calloc(1, total_length);
+        if(e == NULL)
+        {
+                printf("malloc failure");
+                exit(1);
         }
-  	}
 
-return 0;
-} /* main */
+        //offsets to the other bits:
+        //target struct begining
+        e->target_offset = size_ipt_entry + size_ipt_entry_match * 3 + size_ipt_tcp + size_rateinfo + size_physdevinfo;
+        //next "e" struct, end of the current one
+        e->next_offset = total_length;
+
+        //set up packet matching rules: -s 156.145.1.3 -d 168.220.1.9 -i eth0 part
+        //of our desirable rule
+        e->ip.src.s_addr = inet_addr("156.145.1.3");
+        e->ip.smsk.s_addr= inet_addr("255.255.255.255");
+        e->ip.dst.s_addr = inet_addr("168.220.1.9");
+        e->ip.dmsk.s_addr= inet_addr("255.255.255.255");
+        e->ip.invflags |= IPT_INV_SRCIP;
+        e->ip.proto = IPPROTO_TCP;
+        e->nfcache = 0;
+        strcpy(e->ip.iniface, "eth0");
+
+        //match structs setting:
+        //set match rule for the protocol to use
+        //-p tcp part of our desirable rule
+        match_proto = (struct ipt_entry_match *) e->elems;
+        match_proto->u.match_size = size_ipt_entry_match + size_ipt_tcp;
+        strcpy(match_proto->u.user.name, "tcp");//set name of the module, we will use in this match
+
+        //set match rule for the packet number per time limitation - against DoS attacks
+        //-m limit part of our desirable rule
+        match_limit = (struct ipt_entry_match *) (e->elems + match_proto->u.match_size);
+        match_limit->u.match_size = size_ipt_entry_match + size_rateinfo;
+        strcpy(match_limit->u.user.name, "limit");//set name of the module, we will use in this match
+
+        //set match rule for specific Ethernet card (interface)
+        //-m physdev part of our desirable rule
+        match_physdev = (struct ipt_entry_match *) (e->elems + match_proto->u.match_size + match_limit->u.match_size);
+        match_physdev->u.match_size = size_ipt_entry_match + size_physdevinfo;
+        strcpy(match_physdev->u.user.name, "physdev");//set name of the module, we will use in this match
+
+        //tcp module - match extension
+        //--sport 0:80 --dport 0:51201 part of our desirable rule
+        tcpinfo = (struct ipt_tcp *)match_proto->data;
+        tcpinfo->spts[0] = ntohs(0);
+        tcpinfo->spts[1] = ntohs(0x5000);
+        tcpinfo->dpts[0] = ntohs(0);
+        tcpinfo->dpts[1] = ntohs(0x1C8);
+
+
+        //limit module - match extension
+        //--limit 2000/s --limit-burst 10â part of our desirable rule
+        rateinfo = (struct xt_rateinfo *)match_limit->data;
+        rateinfo->avg = 5;
+        rateinfo->burst = 10;
+
+        //physdev module - match extension
+        //-in eth0 part of our desirable rule
+        physdevinfo = (struct xt_physdev_info *)match_physdev->data;
+        strcpy(physdevinfo->physindev, "eth0");
+        memset(physdevinfo->in_mask, 0xFF, IFNAMSIZ);
+        physdevinfo->bitmask = 1;
+
+        target = (struct xt_standard_target *)(e->elems + size_ipt_entry_match * 3 + size_ipt_tcp + size_rateinfo + size_physdevinfo);
+        target->target.u.target_size = size_ipt_entry_target;
+        strcpy(target->target.u.user.name, "ACCEPT");
+
+        h = iptc_init(tablename);
+        if ( !h )
+        {
+                printf("Error initializing: %s\n", iptc_strerror(errno));
+                exit(errno);
+        }
+
+        int x = iptc_append_entry(chain, e, h);
+        if (!x)
+        {
+                printf("Error append_entry: %s\n", iptc_strerror(errno));
+                exit(errno);
+        }
+        printf("%s", target->target.data);
+        int y = iptc_commit(h);
+        if (!y)
+        {
+                printf("Error commit: %s\n", iptc_strerror(errno));
+                exit(errno);
+        }
+
+        exit(0);
+
+}

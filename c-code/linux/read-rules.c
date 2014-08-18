@@ -23,6 +23,19 @@
 
 #define IP_PARTS(n) IP_PARTS_NATIVE(ntohl(n))
 
+struct pprot {
+    char *name;
+    u_int8_t num;
+};
+
+static const struct pprot chain_protos[] = {
+    { "tcp", IPPROTO_TCP },
+    { "udp", IPPROTO_UDP },
+    { "icmp", IPPROTO_ICMP },
+    { "esp", IPPROTO_ESP },
+    { "ah", IPPROTO_AH },
+};
+
 //print interface
 static void print_iface(char letter, const char *iface, const unsigned char *mask, int invert)
 {
@@ -33,7 +46,8 @@ static void print_iface(char letter, const char *iface, const unsigned char *mas
 
     printf("-%c %s", letter, invert ? "! " : "");
 
-    for (i = 0; i < IFNAMSIZ; i++) { //IFNAMSIZ is max size of buffer required to represent an interface
+    for (i = 0; i < IFNAMSIZ; i++) {
+        //IFNAMSIZ is max size of buffer required to represent an interface
         if (mask[i] != 0) {
             if (iface[i] != '\0')
                 printf("%c", iface[i]);
@@ -48,20 +62,6 @@ static void print_iface(char letter, const char *iface, const unsigned char *mas
 
     printf(" ");
 }
-
-
-struct pprot {
-    char *name;
-    u_int8_t num;
-};
-
-static const struct pprot chain_protos[] = {
-    { "tcp", IPPROTO_TCP },
-    { "udp", IPPROTO_UDP },
-    { "icmp", IPPROTO_ICMP },
-    { "esp", IPPROTO_ESP },
-    { "ah", IPPROTO_AH },
-};
 
 //print protocol
 static void print_proto(u_int16_t proto, int invert)
@@ -82,9 +82,9 @@ static void print_proto(u_int16_t proto, int invert)
 
 
 //print match segment
-static int print_match(const struct ipt_entry_match *e, const struct ipt_ip *ip)
+static int print_match(const struct ipt_entry_match *e)
 {
-        printf("-m %s ", e->u.user.name);
+    printf("-m %s ", e->u.user.name);
     return 0;
 }
 
@@ -121,7 +121,7 @@ static void print_rule(const struct ipt_entry *e,struct xtc_handle *h, const cha
 
     print_iface('i', e->ip.iniface, e->ip.iniface_mask, e->ip.invflags & IPT_INV_VIA_IN);
 
-    print_iface('o', e->ip.outiface, e->ip.outiface_mask,e->ip.invflags & IPT_INV_VIA_OUT);
+    print_iface('o', e->ip.outiface, e->ip.outiface_mask, e->ip.invflags & IPT_INV_VIA_OUT);
 
     print_proto(e->ip.proto, e->ip.invflags & IPT_INV_PROTO);
 
@@ -145,7 +145,7 @@ static void print_rule(const struct ipt_entry *e,struct xtc_handle *h, const cha
 
 int main(void)
 {
-  /* Use always this part for your programs .... From here ... **** */
+    /* Use always this part for your programs .... From here ... **** */
     struct xtc_handle *h;
     const struct ipt_entry *e;
     const char *chain = NULL;
@@ -159,11 +159,11 @@ int main(void)
     }
 
     for (chain = iptc_first_chain(h); chain; chain = iptc_next_chain(h))  {
-    	printf("%s\n", chain);
-    	for (e = iptc_first_rule(chain, h); e; e = iptc_next_rule(e, h))  {
+        printf("%s\n", chain);
+        for (e = iptc_first_rule(chain, h); e; e = iptc_next_rule(e, h))  {
             print_rule(e, h, chain, counters);
         }
-  	}
+    }
 
-return 0;
+    return 0;
 } /* main */

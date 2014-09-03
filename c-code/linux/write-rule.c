@@ -54,7 +54,7 @@ int main(void)
         e->ip.src.s_addr = inet_addr("156.145.1.3");
         e->ip.smsk.s_addr= inet_addr("255.255.255.255");
         e->ip.dst.s_addr = inet_addr("168.220.1.9");
-        e->ip.dmsk.s_addr= inet_addr("255.255.255.255");
+        e->ip.dmsk.s_addr= inet_addr("255.255.255.255"); 
         e->ip.invflags |= IPT_INV_SRCIP;
         e->ip.proto = IPPROTO_TCP;
         e->nfcache = 0;

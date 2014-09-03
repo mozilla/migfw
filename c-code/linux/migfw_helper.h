@@ -9,11 +9,23 @@
 
 struct details_write {
         const ipt_chainlabel chain;
+
         const char * tablename;
+
         struct ip_details {
                 char * src_ip, * src_subnet, * dest_ip, * dest_subnet, * iniface;
         } ip;
-        // module data
+
+        /* module data */
+        struct protocol {
+                char * name; // for tcp only ,right now
+                int src_ports[2],dest_ports[2]; // hex values only
+        } proto;
+
+        // physdev
+        // limit
+        // a proper structure for modules needed.
+        /* module data */
         char * jump;
 };
 
@@ -86,10 +98,10 @@ int write_rule(struct details_write *OBJ)
         //tcp module - match extension
         //--sport 0:80 --dport 0:51201 part of our desirable rule
         tcpinfo = (struct ipt_tcp *)match_proto->data;
-        tcpinfo->spts[0] = ntohs(0);
-        tcpinfo->spts[1] = ntohs(0x5000);
-        tcpinfo->dpts[0] = ntohs(0);
-        tcpinfo->dpts[1] = ntohs(0x1C8);
+        tcpinfo->spts[0] = ntohs(OBJ->proto.src_ports[0]);
+        tcpinfo->spts[1] = ntohs(OBJ->proto.src_ports[1]);
+        tcpinfo->dpts[0] = ntohs(OBJ->proto.dest_ports[0]);
+        tcpinfo->dpts[1] = ntohs(OBJ->proto.dest_ports[1]);
 
 
         //limit module - match extension

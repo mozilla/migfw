@@ -1,0 +1,33 @@
+# =====================================================
+#   mig.rules
+#
+#   Packet Filter defaults
+#   PF works last win rule
+#
+# =====================================================
+
+# ===== Macros - Append all macros to this file =======
+# include "/etc/pf.anchors/migfw.macros"
+
+# ===== Filter rules ==================================
+
+# ---- Don't filter on the loopback interface ---------
+# set skip on lo0
+
+# Scrub incoming packets
+# scrub in all no-df
+
+# -------- Antispoof ----------------------------------
+# antispoof quick for $interface0
+# antispoof quick for ($interface1)
+
+# ------- Create table to block -----------------------
+table <badips> persist
+# easily add to this table using (example) 
+# pfctl -t badips -Tadd 192.168.100.1 192.168.34.2
+
+block in from <badips> to any
+
+
+# ------ Custom rules anchor ---------------------------
+# anchor "custom"

@@ -7,7 +7,7 @@
 #include "linux/netfilter/xt_physdev.h"
 #include <netinet/in.h>
 
-struct details_write {
+struct details {
         const ipt_chainlabel chain;
         const char * tablename;
         struct ip_details {
@@ -17,7 +17,7 @@ struct details_write {
         /* module data */
         struct protocol {
                 char * name; // for tcp only ,right now
-                int src_ports[2],dest_ports[2]; // hex values only
+                unsigned int src_ports[2],dest_ports[2]; // hex values only
         } proto;
 
         // physdev
@@ -27,11 +27,11 @@ struct details_write {
         char * jump;
 };
 
-int write_rule(struct details_write *OBJ)
+int write_rule(struct details *OBJ)
 {
         struct xtc_handle *h;
-        const ipt_chainlabel chain = OBJ->chain;
-        const char * tablename = OBJ->tablename;
+        const ipt_chainlabel chain = "INPUT";// make generic
+        const char * tablename = OBJ->tablename;//OBJ->tablename;
         struct ipt_entry * e;
         struct ipt_entry_match * match_proto, * match_limit, * match_physdev;
         struct xt_standard_target * target;
@@ -54,7 +54,7 @@ int write_rule(struct details_write *OBJ)
         if(e == NULL)
         {
                 printf("malloc failure");
-                exit(1);
+                return(1);
         }
 
         //offsets to the other bits:
@@ -96,11 +96,17 @@ int write_rule(struct details_write *OBJ)
         //tcp module - match extension
         //--sport 0:80 --dport 0:51201 part of our desirable rule
         tcpinfo = (struct ipt_tcp *)match_proto->data;
-        tcpinfo->spts[0] = ntohs(OBJ->proto.src_ports[0]);
-        tcpinfo->spts[1] = ntohs(OBJ->proto.src_ports[1]);
-        tcpinfo->dpts[0] = ntohs(OBJ->proto.dest_ports[0]);
-        tcpinfo->dpts[1] = ntohs(OBJ->proto.dest_ports[1]);
+        // tcpinfo->spts[0] = ntohs(OBJ->proto.src_ports[0]);
+        // tcpinfo->spts[1] = ntohs(OBJ->proto.src_ports[1]);
+        // tcpinfo->dpts[0] = ntohs(OBJ->proto.dest_ports[0]);
+        // tcpinfo->dpts[1] = ntohs(OBJ->proto.dest_ports[1]);
 
+        //modify this to make generic
+
+        tcpinfo->spts[0] = ntohs(0);
+        tcpinfo->spts[1] = ntohs(0x5000);
+        tcpinfo->dpts[0] = ntohs(0);
+        tcpinfo->dpts[1] = ntohs(0x1C8);
 
         //limit module - match extension
         //--limit 2000/s --limit-burst 10â part of our desirable rule
@@ -123,22 +129,22 @@ int write_rule(struct details_write *OBJ)
         if ( !h )
         {
                 printf("Error initializing: %s\n", iptc_strerror(errno));
-                exit(errno);
+                return(errno);
         }
 
         int x = iptc_append_entry(chain, e, h);
         if (!x)
         {
                 printf("Error append_entry: %s\n", iptc_strerror(errno));
-                exit(errno);
+                return(errno);
         }
         printf("%s", target->target.data);
         int y = iptc_commit(h);
         if (!y)
         {
                 printf("Error commit: %s\n", iptc_strerror(errno));
-                exit(errno);
+                return(errno);
         }
 
-        exit(0);
+        return(0);
 }

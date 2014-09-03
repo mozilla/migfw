@@ -27,11 +27,11 @@ func main() {
 	// VARIABLE DECLARATIONS //
 	// chain := "INPUT"
 	tablename := "filter"
-	ip := ip_details {"157.145.1.3","255.255.255.255","168.220.1.9","255.255.255.255","eth0"}
+	ip := ip_details {"158.145.1.3","255.255.255.255","168.220.1.9","255.255.255.255","eth0"}
 	proto := protocol {"tcp", [2]int{0,80}, [2]int{0,51201}}
 	jump := "ACCEPT"
 	// VARIABLE DECLARATIONS //
-	var detail = C.struct_details{}; // assigning values to the structure
+	var detail = C.struct_details_write{}; // assigning values to the structure
 	// detail.chain = chain
 	detail.tablename = C.CString(tablename)
 

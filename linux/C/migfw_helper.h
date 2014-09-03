@@ -7,7 +7,7 @@
 #include "linux/netfilter/xt_physdev.h"
 #include <netinet/in.h>
 
-struct details {
+struct details_write {
         const ipt_chainlabel chain;
         const char * tablename;
         struct ip_details {
@@ -27,7 +27,7 @@ struct details {
         char * jump;
 };
 
-int write_rule(struct details *OBJ)
+int write_rule(struct details_write *OBJ)
 {
         struct xtc_handle *h;
         const ipt_chainlabel chain = "INPUT";// make generic

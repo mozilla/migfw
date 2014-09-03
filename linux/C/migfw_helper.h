@@ -9,9 +9,7 @@
 
 struct details_write {
         const ipt_chainlabel chain;
-
         const char * tablename;
-
         struct ip_details {
                 char * src_ip, * src_subnet, * dest_ip, * dest_subnet, * iniface;
         } ip;
@@ -143,5 +141,4 @@ int write_rule(struct details_write *OBJ)
         }
 
         exit(0);
-
 }

@@ -7,7 +7,8 @@ The library retrieves rulesets from host in `JSON` format!
 ### Dependencies
 
 * Linux
-
     * `sudo apt-get install iptables-dev`
+
 * Mac OS
+
 * Windows

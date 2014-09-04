@@ -82,9 +82,21 @@ static void print_proto(u_int16_t proto, int invert)
 
 
 //print match segment
-static int print_match(const struct ipt_entry_match *e)
+// static int print_match(const struct ipt_entry_match *e)
+// {
+//     printf("-m %s ", e->u.user.name);
+//     return 0;
+// }
+
+int print_match(struct ipt_entry_match *e)
 {
-    printf("-m %s ", e->u.user.name);
+    if(strcmp(e->u.user.name,"tcp")!=0)
+        printf("-m %s %s", e->u.user.name,e->data);
+    else
+    {
+        struct ipt_tcp * tcpinfo = (struct ipt_tcp *) e->data;
+        printf("-m %s -sport %u:%u -dport %u:%u ", e->u.user.name,tcpinfo->spts[0],tcpinfo->spts[1],tcpinfo->dpts[0],tcpinfo->dpts[1]);
+    }
     return 0;
 }
 
@@ -96,6 +108,7 @@ static void print_ip(char *prefix, u_int32_t ip, u_int32_t mask, int invert)
 
     printf("%s %s%u.%u.%u.%u", prefix, invert ? "! " : "", IP_PARTS(ip));
 
+    // show ranges using subnet mask 
     if (mask != 0xffffffff)
         printf("/%u.%u.%u.%u ", IP_PARTS(mask));
     else
@@ -130,7 +143,7 @@ static void print_rule(const struct ipt_entry *e,struct xtc_handle *h, const cha
 
     /* Print matchinfo part */
     if (e->target_offset) {
-        IPT_MATCH_ITERATE(e, print_match, &e->ip);
+        IPT_MATCH_ITERATE(e, print_match);
     }
 
     /* Print target name */

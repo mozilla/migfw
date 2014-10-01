@@ -8,6 +8,7 @@ The library retrieves rulesets from host in `JSON` format!
 
 * Linux
     * `sudo apt-get install iptables-dev`
+    * Better install latest iptables package from http://www.netfilter.org/projects/iptables/downloads.html
 
 * Mac OS
 

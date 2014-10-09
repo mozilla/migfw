@@ -5,25 +5,107 @@ package main
 #cgo pkg-config: xtables
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include <error.h>
 #include <libiptc/libiptc.h>
 #include <libiptc/libip6tc.h>
 #include <xtables.h>
 
-char* print_match(struct xt_entry_match *m,struct ipt_ip *ip, int numeric)
-{
-	return m->u.user.name;
+
+char buf[150];
+
+void print_match_ipv4(struct xt_entry_match *m,struct ipt_ip *ip, int numeric, char *buf) {
+	int fds[2];
+  	pipe(fds);
+
+  	if(!fork()) { //child element
+  		close(fds[0]);
+  		dup2(fds[1], STDOUT_FILENO);
+		printf("-m ");
+		xtables_init();
+		xtables_set_nfproto(NFPROTO_IPV4);
+		const struct xtables_match *match = xtables_find_match(m->u.user.name, XTF_LOAD_MUST_SUCCEED, NULL);
+	    if (match) {
+	        if (match->print)
+	            match->print(ip, m, numeric);
+	        else
+	            printf("%s ", match->name);
+	    } else {
+	        if (m->u.user.name[0])
+	            printf("UNKNOWN match `%s' ", m->u.user.name);
+	    }
+	    exit(1);
+	}
+	else {
+		close(fds[1]);
+  		read(fds[0],buf,150);
+	}
+    
+}
+int match_iterate_wrapper_ipv4 (struct ipt_entry *e, unsigned int i) {
+	memset(buf, 0, 150);
+	struct xt_entry_match *m;
+    m = (void *)e + i;
+    i += m->u.match_size;
+    print_match_ipv4(m , &e->ip, 0x0008, buf);
+	return i;
+}
+int getSizeIptEntry() {
+	return ((int) sizeof(struct ipt_entry)); 
 }
 
-char* match_iterate_wrapper (struct ipt_entry *e) {
-	return (char *)IPT_MATCH_ITERATE(e, print_match, &e->ip, 0x0008);
+
+void print_match_ipv6(struct xt_entry_match *m,struct ip6t_ip6 *ip, int numeric, char *buf) {
+	int fds[2];
+  	pipe(fds);
+
+  	if(!fork()) { //child element
+  		close(fds[0]);
+  		dup2(fds[1], STDOUT_FILENO);
+		printf("-m ");
+		xtables_init();
+		xtables_set_nfproto(NFPROTO_IPV6);
+	    const struct xtables_match *match = xtables_find_match(m->u.user.name, XTF_LOAD_MUST_SUCCEED, NULL);
+	    if (match) {
+	        if (match->print)
+	            match->print(ip, m, numeric);
+	        else
+	            printf("%s ", match->name);
+	    } else {
+	        if (m->u.user.name[0])
+	            printf("UNKNOWN match `%s' ", m->u.user.name);
+	    }
+	    exit(1);
+	}
+	else {
+		close(fds[1]);
+  		read(fds[0],buf,150);
+	}
+    
 }
+int match_iterate_wrapper_ipv6 (struct ip6t_entry *e, unsigned int i) {
+	memset(buf, 0, 150);
+	struct xt_entry_match *m;
+    m = (void *)e + i;
+    i += m->u.match_size;
+    print_match_ipv6(m , &e->ipv6, 0x0008, buf);
+	return i;
+}
+int getSizeIpt6Entry() {
+	return ((int) sizeof(struct ip6t_entry)); 
+}
+
 */
 import "C"
 import "errors"
 import "fmt"
 import "net"
+import "bytes"
+import "os"
 import "unsafe"
+import "encoding/json"
+//import "reflect"
 
 /**
  * Declaration of structures and interfaces
@@ -63,6 +145,7 @@ type Rule struct {
 		InDev  Not
 		OutDev Not
 	}
+	Matches []string
 	Target string
 	Counter
 }
@@ -204,15 +287,16 @@ func (s *IPT) Rules(chain string) []*Rule {
 		if r.ip.invflags&C.IPT_INV_DSTIP != 0 {
 			c.Not.Dest = true
 		}
-		//read match -- working on this part
-    /*
+		//read match 
+
 		target_offset := int(r.target_offset)
 		if(target_offset > 0) {
-			err := C.GoString(C.match_iterate_wrapper(r))
-			fmt.Printf(err);
-			
+			for i := uint64(C.getSizeIptEntry()); int(i) < target_offset ;{
+				i = uint64 (C.match_iterate_wrapper_ipv4(r, C.uint(i)))
+				match := C.GoString(&C.buf[0])
+				c.Matches = append(c.Matches, match)
+			}
 		}
-		*/
 
 		// read target
 		target := C.iptc_get_target(r, s.h)
@@ -383,6 +467,16 @@ func (s *IP6T) Rules(chain string) []*Rule {
 			c.Not.Dest = true
 		}
 
+		//read matches
+		target_offset := int(r.target_offset)
+		if(target_offset > 0) {
+			for i := uint64(C.getSizeIpt6Entry()); int(i) < target_offset ;{
+				i = uint64 (C.match_iterate_wrapper_ipv6(r, C.uint(i)))
+				match := C.GoString(&C.buf[0])
+				c.Matches = append(c.Matches, match)
+			}
+		}
+
 		// read target
 		target := C.ip6tc_get_target(r, s.h)
 		if target != nil {
@@ -434,14 +528,16 @@ func (s *IP6T) Close() error {
 }
 
 func (r Rule) String() string {
-	return fmt.Sprintf("in: %s%s, out: %s%s, %s%s -> %s%s -> %s: %d packets, %d bytes",
+	return fmt.Sprintf("in: %s%s, out: %s%s, %s%s -> %s%s -> %s: %s : %d packets, %d bytes",
 		r.Not.InDev, r.InDev,
 		r.Not.OutDev, r.OutDev,
 		r.Not.Src, r.Src,
 		r.Not.Dest, r.Dest,
+		r.Matches,
 		r.Target,
 		r.Packets, r.Bytes)
 }
+
 
 func (n Not) String() string {
 	if n {
@@ -450,11 +546,7 @@ func (n Not) String() string {
 	return " "
 }
 
-
-// ip4 sample code ready here ---
-// ip6 similar code defined above just use IP6T in place of IPT ---
-func main() {
-
+func print_rule4() {
 	ipt, err := NewIPT("filter")
 
 	if (err != nil) {
@@ -469,11 +561,61 @@ func main() {
 
 		rules := ipt.Rules(chain)
 
-		for _, rule := range rules{
-			fmt.Printf("Chain : %s Rule : %s \n", chain, rule)
+		for index , rule := range rules {
+			fmt.Printf ("\n Index: %d, Chain: %s, Rule: %s \n", index, chain, rule)
 		}
 
+		byt, _ := json.Marshal(rules)
+
+		
+		var out bytes.Buffer
+		json.Indent(&out, byt, "=", "\t")
+		out.WriteTo(os.Stdout)
+		
+
 	}
-	ipt.Close()
+	ipt.Close()	
+}
+
+func print_rule6() {
+	ip6t, err := NewIP6T("filter")
+
+	if (err != nil) {
+		panic("Error occured initializing filter table")
+	}
+
+	chains := ip6t.Chains()
+	for _,chain := range chains {
+		if(!ip6t.IsBuiltinChain(chain)) {
+			continue;
+		}
+
+		rules := ip6t.Rules(chain)
+
+		for index , rule := range rules {
+			fmt.Printf ("\n Index: %d, Chain: %s, Rule: %s \n", index, chain, rule)
+		}
+
+		byt, _ := json.Marshal(rules)
+
+		
+		var out bytes.Buffer
+		json.Indent(&out, byt, "=", "\t")
+		out.WriteTo(os.Stdout)
+		
+
+	}
+	ip6t.Close()	
+}
+
+func main() {
+
+	fmt.Println("\n----Iptables Rules -----\n");
+	print_rule4();
+	
+
+	fmt.Println("\n----Ip6tables Rules -----\n");
+	print_rule6();
+	
 
 }

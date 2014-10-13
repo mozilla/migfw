@@ -16,6 +16,7 @@ Abstract:
 #include <netfw.h>
 #include <string>
 #include <iostream>
+#include <vector>
 using namespace std;
 
 #pragma comment( lib, "ole32.lib" )
@@ -33,199 +34,23 @@ using namespace std;
 #define NET_FW_RULE_ENABLE_IN_NAME L"TRUE"
 #define NET_FW_RULE_DISABLE_IN_NAME L"FALSE"
 
-// Structure defination to be used
-class firewallRule {
-public:
+// Structure to hold all information about firewall rules
+struct rules {
 	BSTR Name;
 	BSTR Description;
 	BSTR ApplicationName;
-	BSTR ServiceName;
-	BSTR localPorts;
+	BSTR LocalPorts;
 	BSTR RemotePorts;
-	BSTR localAddress;
-	BSTR remoteAddress;
-	BSTR IcmpTypesAndCodes;
-	BSTR direction;
+	BSTR LocalAddress;
+	BSTR RemoteAddress;
+	BSTR Direction;
 	BSTR Action;
 	BSTR InterfaceType;
-	BSTR Grouping;
-	BSTR EdgeTraversal;
+	BSTR Protocol;
 
-	variant_t InterfaceArray;
-	variant_t InterfaceString;  
-
-	VARIANT_BOOL bEnabled;
-	bool Enabled;
-	BSTR bstrVal;
-
-	long lVal;
-	long lProfileBitmask;
-
-	NET_FW_RULE_DIRECTION fwDirection;
-	NET_FW_ACTION fwAction;
-
-	struct ProfileMapElement 
-	{
-		NET_FW_PROFILE_TYPE2 Id;
-		LPCWSTR Name;
-	};
-
-	/** basic constuctor **/
-	firewallRule() {
-	
-	}
-
-	// Construct the object with firewall rule informations
-	firewallRule(INetFwRule* FwRule) {
-
-		ProfileMapElement ProfileMap[3];
-		ProfileMap[0].Id = NET_FW_PROFILE2_DOMAIN;
-		ProfileMap[0].Name = L"Domain";
-		ProfileMap[1].Id = NET_FW_PROFILE2_PRIVATE;
-		ProfileMap[1].Name = L"Private";
-		ProfileMap[2].Id = NET_FW_PROFILE2_PUBLIC;
-		ProfileMap[2].Name = L"Public";
-
-		if (!SUCCEEDED(FwRule->get_Name(&Name)))
-		// Error message / store it somewhere
-
-		if (!SUCCEEDED(FwRule->get_Description(&Description)))
-		// Error message / store it somewhere
-
-		if (!SUCCEEDED(FwRule->get_ApplicationName(&ApplicationName)))
-		// Error message / store it somewhere
-
-		if (!SUCCEEDED(FwRule->get_ServiceName(&ServiceName)))
-		// Error message / store it somewhere
-
-		if (SUCCEEDED(FwRule->get_Protocol(&lVal)))
-		{
-			/*
-			switch(lVal)
-			{
-				case NET_FW_IP_PROTOCOL_TCP: 
-
-					wprintf(L"IP Protocol:      %s\n", NET_FW_IP_PROTOCOL_TCP_NAME);
-					break;
-
-				case NET_FW_IP_PROTOCOL_UDP: 
-
-					wprintf(L"IP Protocol:      %s\n", NET_FW_IP_PROTOCOL_UDP_NAME);
-					break;
-
-				default:
-					lVal = 0;
-
-					break;
-			}
-			*/
-
-			if(lVal != NET_FW_IP_VERSION_V4 && lVal != NET_FW_IP_VERSION_V6)
-			{
-				if (!SUCCEEDED(FwRule->get_LocalPorts(&localPorts)));
-				// Error message / store it somewhere
-
-				if (!SUCCEEDED(FwRule->get_RemotePorts(&RemotePorts)));
-				// Error message / store it somewhere
-			}
-			else
-			{
-				if (!SUCCEEDED(FwRule->get_IcmpTypesAndCodes(&IcmpTypesAndCodes)));
-				// Error message / store it somewhere
-			}
-		}
-
-		if (!SUCCEEDED(FwRule->get_LocalAddresses(&localAddress)))
-		// Error message / store it somewhere
-
-		if (!SUCCEEDED(FwRule->get_RemoteAddresses(&remoteAddress)))
-		// Error message / store it somewhere
-
-		if (!SUCCEEDED(FwRule->get_Profiles(&lProfileBitmask)))
-		// Error message / store it somewhere
-
-		if (SUCCEEDED(FwRule->get_Direction(&fwDirection)))
-		{
-			switch(fwDirection)
-			{
-				case NET_FW_RULE_DIR_IN:
-
-					direction =  NET_FW_RULE_DIR_IN_NAME;
-					break;
-
-				case NET_FW_RULE_DIR_OUT:
-
-					direction =  NET_FW_RULE_DIR_OUT_NAME;
-					break;
-
-				default:
-
-					break;
-			}
-		}
-
-		if (SUCCEEDED(FwRule->get_Action(&fwAction)))
-		{
-			switch(fwAction)
-			{
-				case NET_FW_ACTION_BLOCK:
-
-					Action = NET_FW_RULE_ACTION_BLOCK_NAME;
-					break;
-
-				case NET_FW_ACTION_ALLOW:
-
-					Action = NET_FW_RULE_ACTION_ALLOW_NAME;
-					break;
-
-				default:
-
-					break;
-			}
-		}
-
-		/*
-		if (SUCCEEDED(FwRule->get_Interfaces(&InterfaceArray)))
-		{
-			if(InterfaceArray.vt != VT_EMPTY)
-			{
-				SAFEARRAY    *pSa = NULL;
-
-				pSa = InterfaceArray.parray;
-
-				for(long index= pSa->rgsabound->lLbound; index < (long)pSa->rgsabound->cElements; index++)
-				{
-					SafeArrayGetElement(pSa, &index, &InterfaceString);
-					wprintf(L"Interfaces:       %s\n", (BSTR)InterfaceString.bstrVal);
-				}
-			}
-		}
-		*/
-
-		if (!SUCCEEDED(FwRule->get_InterfaceTypes(&InterfaceType)))
-		// Error message / store it somewhere
-
-		if (SUCCEEDED(FwRule->get_Enabled(&bEnabled))) {
-			Enabled = (bEnabled)?true:false;	
-		}
-		// Error message / store it somewhere
-
-		if (!SUCCEEDED(FwRule->get_Grouping(&Grouping)))
-		// Error message / store it somewhere
-
-		if (SUCCEEDED(FwRule->get_EdgeTraversal(&bEnabled))) {
-			EdgeTraversal = (bEnabled)? NET_FW_RULE_ENABLE_IN_NAME : NET_FW_RULE_DISABLE_IN_NAME;
-		}
-	}
-
+	BSTR ICMP_Typecode;
+	long Lval;
 };
-
-
-// Forward declarations for global functions
-void        DumpFWRulesInCollection(INetFwRule* FwRule);
-HRESULT     WFCOMInitialize(INetFwPolicy2** ppNetFwPolicy2);
-void		cleanUp();
-
 
 // Declarations for global variables
 HRESULT hrComInit = S_OK;
@@ -233,6 +58,7 @@ HRESULT hr = S_OK;
 
 ULONG cFetched = 0; 
 CComVariant var;
+
 
 IUnknown *pEnumerator;
 IEnumVARIANT* pVariant = NULL;
@@ -242,10 +68,16 @@ INetFwRules *pFwRules = NULL;
 INetFwRule *pFwRule = NULL;
 
 long fwRuleCount;
-bool hasInitiated = false;
+
+// Forward declarations for global functions
+void        DumpFWRulesInCollection(INetFwRule* FwRule);
+HRESULT     WFCOMInitialize(INetFwPolicy2** ppNetFwPolicy2);
+void		cleanUp();
+bool		init();
+rules		GetRules(INetFwRule* FwRule);
 
 /**
- * Function to retrieve the firewall rules
+ * Function to retrieve the the firewall rules, and update global variables
  * @param: void
  * @return: bool - true for successful init else false;
  */
@@ -263,7 +95,7 @@ bool init() {
     {
         if (FAILED(hrComInit))
         {
-            //wprintf(L"CoInitializeEx failed: 0x%08lx\n", hrComInit);
+            wprintf(L"CoInitializeEx failed: 0x%08lx\n", hrComInit);
             cleanUp();
 			return false;
         }
@@ -281,7 +113,7 @@ bool init() {
     hr = pNetFwPolicy2->get_Rules(&pFwRules);
     if (FAILED(hr))
     {
-        //wprintf(L"get_Rules failed: 0x%08lx\n", hr);
+        wprintf(L"get_Rules failed: 0x%08lx\n", hr);
         cleanUp();
 		return false;
     }
@@ -290,15 +122,12 @@ bool init() {
     hr = pFwRules->get_Count(&fwRuleCount);
     if (FAILED(hr))
     {
-        //wprintf(L"get_Count failed: 0x%08lx\n", hr);
+        wprintf(L"get_Count failed: 0x%08lx\n", hr);
 		cleanUp();
 		return false;
     }
     
-    //wprintf(L"The number of rules in the Windows Firewall are %d\n", fwRuleCount);
-
-    
-	// Iterate through all of the rules in pFwRules
+    // Iterate through all of the rules in pFwRules
 	pFwRules->get__NewEnum(&pEnumerator);
 
     if(pEnumerator)
@@ -306,61 +135,6 @@ bool init() {
         hr = pEnumerator->QueryInterface(__uuidof(IEnumVARIANT), (void **) &pVariant);
     }
 	return true;
-}
-
-void printRules(std::string s) {
-	if (!hasInitiated)
-		hasInitiated = init();
-
-	// if init() fails return
-	if (!hasInitiated) {
-		// Some error message & return
-		return;
-	}
-
-	// Convert the char * ip to BSTR for match
-	std::wstring ws;
-	ws.assign(s.begin(), s.end());
-	BSTR ip = SysAllocStringLen(ws.data(), ws.size());
-
-	//BSTR ip = SysAllocString(L"192.168");
-
-	BSTR localAddress;
-	bool resultFound  = false;
-
-    while(SUCCEEDED(hr) && hr != S_FALSE)
-    {
-        var.Clear();
-        hr = pVariant->Next(1, &var, &cFetched);
-
-        if (S_FALSE != hr)
-        {
-            if (SUCCEEDED(hr))
-            {
-                hr = var.ChangeType(VT_DISPATCH);
-            }
-            if (SUCCEEDED(hr))
-            {
-                hr = (V_DISPATCH(&var))->QueryInterface(__uuidof(INetFwRule), reinterpret_cast<void**>(&pFwRule));
-            }
-
-            if (SUCCEEDED(hr))
-            {
-                // Output the properties of this rule
-				pFwRule->get_LocalAddresses(&localAddress);
-				
-				if (wcsstr(localAddress, ip) != NULL) {
-					DumpFWRulesInCollection(pFwRule);
-					resultFound = true;
-				}
-				
-            }
-        }
-    }
-
-	if (!resultFound) {
-		wprintf(L"No match found!");
-	}  
 }
 
 void cleanUp() {
@@ -382,214 +156,6 @@ void cleanUp() {
         CoUninitialize();
     }
 }
-
-// Temporary function to print the firewall rules to console
-// Later mergethis to firewall-rule class as a display() method
-void DumpFWRulesInCollection(INetFwRule* FwRule)
-{
-    variant_t InterfaceArray;
-    variant_t InterfaceString;  
-
-    VARIANT_BOOL bEnabled;
-    BSTR bstrVal;
-
-    long lVal = 0;
-    long lProfileBitmask = 0;
-
-    NET_FW_RULE_DIRECTION fwDirection;
-    NET_FW_ACTION fwAction;
-
-    struct ProfileMapElement 
-    {
-        NET_FW_PROFILE_TYPE2 Id;
-        LPCWSTR Name;
-    };
-
-    ProfileMapElement ProfileMap[3];
-    ProfileMap[0].Id = NET_FW_PROFILE2_DOMAIN;
-    ProfileMap[0].Name = L"Domain";
-    ProfileMap[1].Id = NET_FW_PROFILE2_PRIVATE;
-    ProfileMap[1].Name = L"Private";
-    ProfileMap[2].Id = NET_FW_PROFILE2_PUBLIC;
-    ProfileMap[2].Name = L"Public";
-
-    wprintf(L"---------------------------------------------\n");
-
-    if (SUCCEEDED(FwRule->get_Name(&bstrVal)))
-    {
-        wprintf(L"Name:             %s\n", bstrVal);
-    }
-
-    if (SUCCEEDED(FwRule->get_Description(&bstrVal)))
-    {
-        wprintf(L"Description:      %s\n", bstrVal);
-    }
-
-    if (SUCCEEDED(FwRule->get_ApplicationName(&bstrVal)))
-    {
-        wprintf(L"Application Name: %s\n", bstrVal);
-    }
-
-    if (SUCCEEDED(FwRule->get_ServiceName(&bstrVal)))
-    {
-        wprintf(L"Service Name:     %s\n", bstrVal);
-    }
-
-    if (SUCCEEDED(FwRule->get_Protocol(&lVal)))
-    {
-        switch(lVal)
-        {
-            case NET_FW_IP_PROTOCOL_TCP: 
-
-                wprintf(L"IP Protocol:      %s\n", NET_FW_IP_PROTOCOL_TCP_NAME);
-                break;
-
-            case NET_FW_IP_PROTOCOL_UDP: 
-
-                wprintf(L"IP Protocol:      %s\n", NET_FW_IP_PROTOCOL_UDP_NAME);
-                break;
-
-            default:
-
-                break;
-        }
-
-        if(lVal != NET_FW_IP_VERSION_V4 && lVal != NET_FW_IP_VERSION_V6)
-        {
-            if (SUCCEEDED(FwRule->get_LocalPorts(&bstrVal)))
-            {
-                wprintf(L"Local Ports:      %s\n", bstrVal);
-            }
-
-            if (SUCCEEDED(FwRule->get_RemotePorts(&bstrVal)))
-            {
-                wprintf(L"Remote Ports:      %s\n", bstrVal);
-            }
-        }
-        else
-        {
-            if (SUCCEEDED(FwRule->get_IcmpTypesAndCodes(&bstrVal)))
-            {
-                wprintf(L"ICMP TypeCode:      %s\n", bstrVal);
-            }
-        }
-    }
-
-    if (SUCCEEDED(FwRule->get_LocalAddresses(&bstrVal)))
-    {
-        wprintf(L"LocalAddresses:   %s\n", bstrVal);
-    }
-
-    if (SUCCEEDED(FwRule->get_RemoteAddresses(&bstrVal)))
-    {
-        wprintf(L"RemoteAddresses:  %s\n", bstrVal);
-    }
-
-    if (SUCCEEDED(FwRule->get_Profiles(&lProfileBitmask)))
-    {
-        // The returned bitmask can have more than 1 bit set if multiple profiles 
-        //   are active or current at the same time
-
-        for (int i=0; i<3; i++)
-        {
-            if ( lProfileBitmask & ProfileMap[i].Id  )
-            {
-                wprintf(L"Profile:  %s\n", ProfileMap[i].Name);
-            }
-        }
-    }
-
-    if (SUCCEEDED(FwRule->get_Direction(&fwDirection)))
-    {
-        switch(fwDirection)
-        {
-            case NET_FW_RULE_DIR_IN:
-
-                wprintf(L"Direction:        %s\n", NET_FW_RULE_DIR_IN_NAME);
-                break;
-
-            case NET_FW_RULE_DIR_OUT:
-
-                wprintf(L"Direction:        %s\n", NET_FW_RULE_DIR_OUT_NAME);
-                break;
-
-            default:
-
-                break;
-        }
-    }
-
-    if (SUCCEEDED(FwRule->get_Action(&fwAction)))
-    {
-        switch(fwAction)
-        {
-            case NET_FW_ACTION_BLOCK:
-
-                wprintf(L"Action:           %s\n", NET_FW_RULE_ACTION_BLOCK_NAME);
-                break;
-
-            case NET_FW_ACTION_ALLOW:
-
-                wprintf(L"Action:           %s\n", NET_FW_RULE_ACTION_ALLOW_NAME);
-                break;
-
-            default:
-
-                break;
-        }
-    }
-
-    if (SUCCEEDED(FwRule->get_Interfaces(&InterfaceArray)))
-    {
-        if(InterfaceArray.vt != VT_EMPTY)
-        {
-            SAFEARRAY    *pSa = NULL;
-
-            pSa = InterfaceArray.parray;
-
-            for(long index= pSa->rgsabound->lLbound; index < (long)pSa->rgsabound->cElements; index++)
-            {
-                SafeArrayGetElement(pSa, &index, &InterfaceString);
-                wprintf(L"Interfaces:       %s\n", (BSTR)InterfaceString.bstrVal);
-            }
-        }
-    }
-
-    if (SUCCEEDED(FwRule->get_InterfaceTypes(&bstrVal)))
-    {
-        wprintf(L"Interface Types:  %s\n", bstrVal);
-    }
-
-    if (SUCCEEDED(FwRule->get_Enabled(&bEnabled)))
-    {
-        if (bEnabled)
-        {
-            wprintf(L"Enabled:          %s\n", NET_FW_RULE_ENABLE_IN_NAME);
-        }
-        else
-        {
-            wprintf(L"Enabled:          %s\n", NET_FW_RULE_DISABLE_IN_NAME);
-        }
-    }
-
-    if (SUCCEEDED(FwRule->get_Grouping(&bstrVal)))
-    {
-        wprintf(L"Grouping:         %s\n", bstrVal);
-    }
-
-    if (SUCCEEDED(FwRule->get_EdgeTraversal(&bEnabled)))
-    {
-        if (bEnabled)
-        {
-            wprintf(L"Edge Traversal:   %s\n", NET_FW_RULE_ENABLE_IN_NAME);
-        }
-        else
-        {
-            wprintf(L"Edge Traversal:   %s\n", NET_FW_RULE_DISABLE_IN_NAME);
-        }
-    }
-}
-
 
 // Instantiate INetFwPolicy2
 HRESULT WFCOMInitialize(INetFwPolicy2** ppNetFwPolicy2)
@@ -613,20 +179,213 @@ Cleanup:
     return hr;
 }
 
+/*
+ * Function to getFirewall rules by matching ip string
+ */
+vector <rules> GetRulesByIP(std::string ip) {
+	vector <rules> r;
+
+	// Initialize COM and ...
+	// Retrieve all firewall rules to pfrules object (global)
+	if (!init()) {
+		// initialize failed
+		// return an empty vector
+		return r;
+	}
+
+	// Convert the char * ip to BSTR for match
+	std::wstring ws;
+	ws.assign(ip.begin(), ip.end());
+	BSTR ipString = SysAllocStringLen(ws.data(), ws.size());
+
+	BSTR localAddress;
+
+	while(SUCCEEDED(hr) && hr != S_FALSE)
+    {
+        var.Clear();
+        hr = pVariant->Next(1, &var, &cFetched);
+
+        if (S_FALSE != hr)
+        {
+            if (SUCCEEDED(hr))
+            {
+                hr = var.ChangeType(VT_DISPATCH);
+            }
+            if (SUCCEEDED(hr))
+            {
+                hr = (V_DISPATCH(&var))->QueryInterface(__uuidof(INetFwRule), reinterpret_cast<void**>(&pFwRule));
+            }
+
+            if (SUCCEEDED(hr))
+            {
+                // Output the properties of this rule
+				pFwRule->get_LocalAddresses(&localAddress);
+				
+				// Match the given ip string with current ip
+				// @todo - convert the ip in argument to a structure such that you
+				// do a int based comparision, and devise a method for ip range search as well
+				if (wcsstr(localAddress, ipString) != NULL) {
+					r.push_back(GetRules(pFwRule));
+				}
+				
+            }
+        }
+    }
+	cleanUp();
+
+	return r;
+}
+
+rules GetRules(INetFwRule* FwRule) {
+		rules ret;
+		if (!SUCCEEDED(FwRule->get_Name(&ret.Name))) {
+			// @todo - do something
+		}
+
+		if (!SUCCEEDED(FwRule->get_Description(&ret.Description)))
+		{
+			// @todo - do something
+		}
+
+		if (!SUCCEEDED(FwRule->get_ApplicationName(&ret.ApplicationName)))
+		{
+			// @todo - do something
+		}
+
+		if (!SUCCEEDED(FwRule->get_LocalAddresses(&ret.LocalAddress)))
+		{
+			// @todo - do something
+		}
+
+		if (!SUCCEEDED(FwRule->get_RemoteAddresses(&ret.RemoteAddress)))
+		{
+			// @todo - do something
+		}
+
+		if (SUCCEEDED(FwRule->get_Protocol(&ret.Lval)))
+		{
+			switch(ret.Lval)
+			{
+				case NET_FW_IP_PROTOCOL_TCP: 
+
+					ret.Protocol =  NET_FW_IP_PROTOCOL_TCP_NAME;
+					break;
+
+				case NET_FW_IP_PROTOCOL_UDP: 
+
+					ret.Protocol = NET_FW_IP_PROTOCOL_UDP_NAME;
+					break;
+
+				default:
+					ret.Protocol = L"Undefined";
+					break;
+			}
+
+			if(ret.Lval != NET_FW_IP_VERSION_V4 && ret.Lval != NET_FW_IP_VERSION_V6)
+			{
+				if (!SUCCEEDED(FwRule->get_LocalPorts(&ret.LocalPorts)))
+				{
+					// @todo - do something
+				}
+
+				if (!SUCCEEDED(FwRule->get_RemotePorts(&ret.RemotePorts)))
+				{
+					// @todo - do something
+				}
+			}
+			else
+			{
+				if (!SUCCEEDED(FwRule->get_IcmpTypesAndCodes(&ret.ICMP_Typecode)))
+				{
+					// @todo - do something
+				}
+			}
+		}
+
+		NET_FW_RULE_DIRECTION fwDirection;
+		NET_FW_ACTION fwAction;
+
+		if (SUCCEEDED(FwRule->get_Direction(&fwDirection)))
+		{
+			switch(fwDirection)
+			{
+			case NET_FW_RULE_DIR_IN:
+				ret.Direction = NET_FW_RULE_DIR_IN_NAME;
+				break;
+			case NET_FW_RULE_DIR_OUT:
+				ret.Direction = NET_FW_RULE_DIR_OUT_NAME;
+				break;
+			default:
+				break;
+			}
+		}
+
+		if (SUCCEEDED(FwRule->get_Action(&fwAction)))
+		{
+			switch(fwAction)
+			{
+			case NET_FW_ACTION_BLOCK:
+				ret.Action = NET_FW_RULE_ACTION_BLOCK_NAME;
+				break;
+			case NET_FW_ACTION_ALLOW:
+				ret.Action = NET_FW_RULE_ACTION_ALLOW_NAME;
+				break;
+			default:
+				break;
+			}
+		}
+		return ret;
+}
+
+
+
+
+// ----------------------------------------------------
 // Temporary function for current debugging purposes
 // Alter when this code will be served as library
+
+// Function to print the properties of rules structure passed
+// as an argument, to console
+void DumpRule(rules r) {
+	wprintf(L" -------------------------------------------\n ");
+	wprintf(L" Name: %s\n ", r.Name);
+	wprintf(L" Description: %s\n ", r.Description);
+	
+	wprintf(L" Application Name: %s\n ", r.ApplicationName);
+	wprintf(L" local address: %s\n ", r.LocalAddress);
+	wprintf(L" remote address: %s\n ", r.RemoteAddress);
+	wprintf(L" IP Protocol: %s\n ", r.Protocol);
+	
+	if(r.Lval != NET_FW_IP_VERSION_V4 && r.Lval != NET_FW_IP_VERSION_V6) {
+		wprintf(L" remote ports: %s\n ", r.RemotePorts);
+		wprintf(L" local ports: %s\n ", r.LocalPorts);
+    } else wprintf(L" ICMP TypeCode: %s\n ", r.ICMP_Typecode);
+
+	wprintf(L" Direction: %s\n ", r.Direction);
+	wprintf(L" Action: %s\n ", r.Action);
+}
+
+void printMatchingRules(std::string s) {
+	vector <rules> r = GetRulesByIP(s);
+
+	wprintf(L" No of matching rules: %d \n", r.size());
+	;
+	for(int i = 0; i < r.size(); i++) {
+		DumpRule(r[i]);
+	}
+}
+
 int __cdecl main()
 {
-	/** main() for testing purposes **/
-	hasInitiated = init();
 
 	wprintf(L"Enter IP address you want to find rule for");
 	std::string s;
 	std::cin>>s;
-	std::cout<<"Attempting for "<<s;
+	std::cout<<"Attempting for "<<s<<"\n";
 
-	printRules(s);
+	printMatchingRules(s);
 
+	getchar();
 	getchar();
     return 0;
 }

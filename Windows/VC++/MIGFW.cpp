@@ -1,80 +1,21 @@
-/********************************************************************
-Copyright (C) Microsoft. All Rights Reserved.
-
-Abstract:
-    This C++ file includes code for enumerating Windows Firewall
-    rules using the Microsoft Windows Firewall APIs. This code will
-	be used in a Go library using CGO.
-
-********************************************************************/
-
 #include "stdafx.h"
-#include <windows.h>
-#include <stdio.h>
-#include <comutil.h>
-#include <atlcomcli.h>
-#include <netfw.h>
-#include <string>
-#include <iostream>
-#include <vector>
+#include "migfw.h"
 using namespace std;
-
-#pragma comment( lib, "ole32.lib" )
-#pragma comment( lib, "oleaut32.lib" )
-
-#define NET_FW_IP_PROTOCOL_TCP_NAME L"TCP"
-#define NET_FW_IP_PROTOCOL_UDP_NAME L"UDP"
-
-#define NET_FW_RULE_DIR_IN_NAME L"In"
-#define NET_FW_RULE_DIR_OUT_NAME L"Out"
-
-#define NET_FW_RULE_ACTION_BLOCK_NAME L"Block"
-#define NET_FW_RULE_ACTION_ALLOW_NAME L"Allow"
-
-#define NET_FW_RULE_ENABLE_IN_NAME L"TRUE"
-#define NET_FW_RULE_DISABLE_IN_NAME L"FALSE"
-
-// Structure to hold all information about firewall rules
-struct rules {
-	BSTR Name;
-	BSTR Description;
-	BSTR ApplicationName;
-	BSTR LocalPorts;
-	BSTR RemotePorts;
-	BSTR LocalAddress;
-	BSTR RemoteAddress;
-	BSTR Direction;
-	BSTR Action;
-	BSTR InterfaceType;
-	BSTR Protocol;
-
-	BSTR ICMP_Typecode;
-	long Lval;
-};
 
 // Declarations for global variables
 HRESULT hrComInit = S_OK;
 HRESULT hr = S_OK;
-
 ULONG cFetched = 0; 
 CComVariant var;
-
-
-IUnknown *pEnumerator;
-IEnumVARIANT* pVariant = NULL;
 
 INetFwPolicy2 *pNetFwPolicy2 = NULL;
 INetFwRules *pFwRules = NULL;
 INetFwRule *pFwRule = NULL;
 
-long fwRuleCount;
+IUnknown *pEnumerator;
+IEnumVARIANT* pVariant = NULL;
 
-// Forward declarations for global functions
-void        DumpFWRulesInCollection(INetFwRule* FwRule);
-HRESULT     WFCOMInitialize(INetFwPolicy2** ppNetFwPolicy2);
-void		cleanUp();
-bool		init();
-rules		GetRules(INetFwRule* FwRule);
+long fwRuleCount;
 
 /**
  * Function to retrieve the the firewall rules, and update global variables
@@ -137,6 +78,11 @@ bool init() {
 	return true;
 }
 
+/**
+ * Function to clean the object created for retrieving firewall rules
+ * @param: void
+ * @return: void
+ */
 void cleanUp() {
 	// Release pFwRule
     if (pFwRule != NULL)
@@ -157,7 +103,11 @@ void cleanUp() {
     }
 }
 
-// Instantiate INetFwPolicy2
+/**
+ * Function to Instantiate INetFwPolicy2
+ * @param: INetFwPolicy2** ppNetFwPolicy2, reference to ptr to INetFwPolicy2 object
+ * @return: HRESULT status
+ */
 HRESULT WFCOMInitialize(INetFwPolicy2** ppNetFwPolicy2)
 {
     HRESULT hr = S_OK;
@@ -179,10 +129,12 @@ Cleanup:
     return hr;
 }
 
-/*
- * Function to getFirewall rules by matching ip string
+/**
+ * Function to read firewallRules one by one and return
+ *  a vector of rules that matches the rules
+ * @param: 
  */
-vector <rules> GetRulesByIP(std::string ip) {
+vector <rules> GetRulesByFilter(std::string ip) {
 	vector <rules> r;
 
 	// Initialize COM and ...
@@ -338,55 +290,124 @@ rules GetRules(INetFwRule* FwRule) {
 }
 
 
+/**
+ * Function to read firewallRules one by one and return
+ *  a vector of rules that matches the rules
+ * @param: mask (int) - each bit represent which all filter
+ *		conditions are active, ex 0010110, means those with one need to be checked.
+ *		bit-0: Name, bit-1: local Address, bit-2: remote addr, bit-3: local port
+ *		bit-4: remote port, bit-5: protocol, bit-6: direction, bit-7: Action
+ *		mask = 0, means no filter rules, enumerate all rules
+ * @param: string Name - substring of the firewall rule
+ */
+vector <rules> GetRulesByFilter(int mask, std::string ip) {
+	vector <rules> r;
 
-
-// ----------------------------------------------------
-// Temporary function for current debugging purposes
-// Alter when this code will be served as library
-
-// Function to print the properties of rules structure passed
-// as an argument, to console
-void DumpRule(rules r) {
-	wprintf(L" -------------------------------------------\n ");
-	wprintf(L" Name: %s\n ", r.Name);
-	wprintf(L" Description: %s\n ", r.Description);
-	
-	wprintf(L" Application Name: %s\n ", r.ApplicationName);
-	wprintf(L" local address: %s\n ", r.LocalAddress);
-	wprintf(L" remote address: %s\n ", r.RemoteAddress);
-	wprintf(L" IP Protocol: %s\n ", r.Protocol);
-	
-	if(r.Lval != NET_FW_IP_VERSION_V4 && r.Lval != NET_FW_IP_VERSION_V6) {
-		wprintf(L" remote ports: %s\n ", r.RemotePorts);
-		wprintf(L" local ports: %s\n ", r.LocalPorts);
-    } else wprintf(L" ICMP TypeCode: %s\n ", r.ICMP_Typecode);
-
-	wprintf(L" Direction: %s\n ", r.Direction);
-	wprintf(L" Action: %s\n ", r.Action);
-}
-
-void printMatchingRules(std::string s) {
-	vector <rules> r = GetRulesByIP(s);
-
-	wprintf(L" No of matching rules: %d \n", r.size());
-	;
-	for(int i = 0; i < r.size(); i++) {
-		DumpRule(r[i]);
+	// Initialize COM and ...
+	// Retrieve all firewall rules to pfrules object (global)
+	if (!init()) {
+		// initialize failed
+		// return an empty vector
+		return r;
 	}
+
+	// Convert the char * ip to BSTR for match
+	std::wstring ws;
+	ws.assign(ip.begin(), ip.end());
+	BSTR ipString = SysAllocStringLen(ws.data(), ws.size());
+
+	while(SUCCEEDED(hr) && hr != S_FALSE)
+    {
+        var.Clear();
+        hr = pVariant->Next(1, &var, &cFetched);
+
+        if (S_FALSE != hr)
+        {
+            if (SUCCEEDED(hr))
+            {
+                hr = var.ChangeType(VT_DISPATCH);
+            }
+            if (SUCCEEDED(hr))
+            {
+                hr = (V_DISPATCH(&var))->QueryInterface(__uuidof(INetFwRule), reinterpret_cast<void**>(&pFwRule));
+            }
+
+            if (SUCCEEDED(hr))
+            {
+				// Get the information about this rule
+				rules rule = GetRules(pFwRule);
+
+				if ((mask & 1) != 0) {
+					// Means bit - 0 is set, need to check for name
+				}
+
+				if ((mask & 2) != 0) {
+					// means bit - 1 is set need to check for local Address 
+				}
+
+				if ((mask & 4) != 0) {
+					// means bit - 2 is set need to check for remote Address 
+				}
+
+				if ((mask & 8) != 0) {
+					// means bit - 3 is set need to check for local ports
+					// Match the given ip string with current ip
+					// @todo - convert the ip in argument to a structure such that you
+					// do a int based comparision, and devise a method for ip range search as well
+					if (wcsstr(rule.LocalAddress, ipString) == NULL) continue;
+				}
+
+				if ((mask & 16) != 0) {
+					// means bit - 4 is set need to check for remote ports
+				}
+
+				if ((mask & 32) != 0) {
+					// means bit - 5 is set need to check for protocol 
+				}
+
+				if ((mask & 64) != 0) {
+					// means bit - 6 is set need to check for direction 
+				}
+
+				if ((mask & 128) != 0) {
+					// means bit - 7 is set need to check for action 
+				}
+
+				
+				// Rule passed every filter hence, it should be returned back!
+				// push it to vector
+				r.push_back(GetRules(pFwRule));
+            }
+        }
+    }
+	cleanUp();
+
+	return r;
 }
 
-int __cdecl main()
-{
 
-	wprintf(L"Enter IP address you want to find rule for");
-	std::string s;
-	std::cin>>s;
-	std::cout<<"Attempting for "<<s<<"\n";
+// ----- helper functions ----------
 
-	printMatchingRules(s);
+// Take input of form a.b.c.d and return its IP_ADDRESS Object
+IP_ADDRESS IPStringtoIP(std::string ipstring) {
+	IP_ADDRESS addr;
+	addr.mask = 32;
+	// ^ since it represnt a single ip address
 
-	getchar();
-	getchar();
-    return 0;
+	int status = 0, i = 0, len = ipstring.length();
+	for(; i < len; i++) {
+		if (ipstring[i] == '.') status++;
+		else {
+			addr.value[status] = addr.value[status] * 10 + (ipstring[i] - '0');
+		}
+
+		if (status > 3) break;
+	}
+	return addr;
 }
 
+// Take input of form a.b.c1.d1-a.b.c2.d2 and return a.b.c.d/mask
+IP_ADDRESS IPRangetoIP(std::string iprange) {
+	// possible algo split on '-', get ip for both and then compute the subnet
+
+}

@@ -129,65 +129,6 @@ Cleanup:
     return hr;
 }
 
-/**
- * Function to read firewallRules one by one and return
- *  a vector of rules that matches the rules
- * @param: 
- */
-vector <rules> GetRulesByFilter(std::string ip) {
-	vector <rules> r;
-
-	// Initialize COM and ...
-	// Retrieve all firewall rules to pfrules object (global)
-	if (!init()) {
-		// initialize failed
-		// return an empty vector
-		return r;
-	}
-
-	// Convert the char * ip to BSTR for match
-	std::wstring ws;
-	ws.assign(ip.begin(), ip.end());
-	BSTR ipString = SysAllocStringLen(ws.data(), ws.size());
-
-	BSTR localAddress;
-
-	while(SUCCEEDED(hr) && hr != S_FALSE)
-    {
-        var.Clear();
-        hr = pVariant->Next(1, &var, &cFetched);
-
-        if (S_FALSE != hr)
-        {
-            if (SUCCEEDED(hr))
-            {
-                hr = var.ChangeType(VT_DISPATCH);
-            }
-            if (SUCCEEDED(hr))
-            {
-                hr = (V_DISPATCH(&var))->QueryInterface(__uuidof(INetFwRule), reinterpret_cast<void**>(&pFwRule));
-            }
-
-            if (SUCCEEDED(hr))
-            {
-                // Output the properties of this rule
-				pFwRule->get_LocalAddresses(&localAddress);
-				
-				// Match the given ip string with current ip
-				// @todo - convert the ip in argument to a structure such that you
-				// do a int based comparision, and devise a method for ip range search as well
-				if (wcsstr(localAddress, ipString) != NULL) {
-					r.push_back(GetRules(pFwRule));
-				}
-				
-            }
-        }
-    }
-	cleanUp();
-
-	return r;
-}
-
 rules GetRules(INetFwRule* FwRule) {
 		rules ret;
 		if (!SUCCEEDED(FwRule->get_Name(&ret.Name))) {
@@ -262,10 +203,10 @@ rules GetRules(INetFwRule* FwRule) {
 			switch(fwDirection)
 			{
 			case NET_FW_RULE_DIR_IN:
-				ret.Direction = NET_FW_RULE_DIR_IN_NAME;
+				ret.Direction = DIRECTION_IN;
 				break;
 			case NET_FW_RULE_DIR_OUT:
-				ret.Direction = NET_FW_RULE_DIR_OUT_NAME;
+				ret.Direction = DIRECTION_OUT;
 				break;
 			default:
 				break;
@@ -277,10 +218,10 @@ rules GetRules(INetFwRule* FwRule) {
 			switch(fwAction)
 			{
 			case NET_FW_ACTION_BLOCK:
-				ret.Action = NET_FW_RULE_ACTION_BLOCK_NAME;
+				ret.Action = ACTION_BLOCK;
 				break;
 			case NET_FW_ACTION_ALLOW:
-				ret.Action = NET_FW_RULE_ACTION_ALLOW_NAME;
+				ret.Action = ACTION_ALLOW;
 				break;
 			default:
 				break;
@@ -288,7 +229,6 @@ rules GetRules(INetFwRule* FwRule) {
 		}
 		return ret;
 }
-
 
 /**
  * Function to read firewallRules one by one and return
@@ -300,7 +240,9 @@ rules GetRules(INetFwRule* FwRule) {
  *		mask = 0, means no filter rules, enumerate all rules
  * @param: string Name - substring of the firewall rule
  */
-vector <rules> GetRulesByFilter(int mask, std::string ip) {
+vector <rules> GetRulesByFilter(int mask, std::string name, std::string local_ip,
+								std::string remote_ip, std::string local_port,
+								std::string remote_port, int protocol, int direction, int action) {
 	vector <rules> r;
 
 	// Initialize COM and ...
@@ -310,11 +252,6 @@ vector <rules> GetRulesByFilter(int mask, std::string ip) {
 		// return an empty vector
 		return r;
 	}
-
-	// Convert the char * ip to BSTR for match
-	std::wstring ws;
-	ws.assign(ip.begin(), ip.end());
-	BSTR ipString = SysAllocStringLen(ws.data(), ws.size());
 
 	while(SUCCEEDED(hr) && hr != S_FALSE)
     {
@@ -339,42 +276,104 @@ vector <rules> GetRulesByFilter(int mask, std::string ip) {
 
 				if ((mask & 1) != 0) {
 					// Means bit - 0 is set, need to check for name
+					std::wstring ws;
+					ws.assign(name.begin(), name.end());
+					BSTR name = SysAllocStringLen(ws.data(), ws.size());
+					if (wcsstr(rule.Name, name) == NULL) continue;
 				}
 
 				if ((mask & 2) != 0) {
-					// means bit - 1 is set need to check for local Address 
+					// means bit - 1 is set need to check for local Address
+					// parse the ip string for this rule and check if the given range belongs to any of those
+					IP_RANGE rneedle = IPRangetoIP(local_ip), rhaystack;
+					std::string iprangestr;
+					
+					int start = 0, end = 0, i;
+					std::string localAddress = BstrToStdString(rule.LocalAddress);
+					int len = localAddress.length();
+					for(i = 0; i <= len; i++) {
+						if (i == len) {
+							// last case
+							iprangestr = localAddress.substr(start, len + 1);
+							rhaystack = IPRangetoIP(iprangestr);
+							if (inRange(rhaystack, rneedle)) break;
+						} else {
+							if (localAddress[i] == ',') {
+								iprangestr = localAddress.substr(start, i);
+								rhaystack = IPRangetoIP(iprangestr);
+								if (inRange(rhaystack, rneedle)) break;
+								start = i + 1;
+							}
+						}
+					}
+					if (i == len + 1) continue;
 				}
 
 				if ((mask & 4) != 0) {
-					// means bit - 2 is set need to check for remote Address 
+					// means bit - 2 is set need to check for remote Address
+					IP_RANGE rneedle = IPRangetoIP(remote_ip), rhaystack;
+					std::string iprangestr;
+					
+					int start = 0, end = 0, i;
+					std::string remoteAddress = BstrToStdString(rule.RemoteAddress);
+					int len = remoteAddress.length();
+					for(i = 0; i <= len; i++) {
+						if (i == len) {
+							// last case
+							iprangestr = remoteAddress.substr(start, len + 1);
+							rhaystack = IPRangetoIP(iprangestr);
+							if (inRange(rhaystack, rneedle)) break;
+						} else {
+							if (remoteAddress[i] == ',') {
+								iprangestr = remoteAddress.substr(start, i);
+								rhaystack = IPRangetoIP(iprangestr);
+								if (inRange(rhaystack, rneedle)) break;
+								start = i + 1;
+							}
+						}
+					}
+					if (i == len + 1) continue;
 				}
 
 				if ((mask & 8) != 0) {
 					// means bit - 3 is set need to check for local ports
-					// Match the given ip string with current ip
-					// @todo - convert the ip in argument to a structure such that you
-					// do a int based comparision, and devise a method for ip range search as well
-					if (wcsstr(rule.LocalAddress, ipString) == NULL) continue;
+					// if the rule value is * means it allows every value, so
+					// filter can be skipped, else check
+					if (rule.LocalPorts[0] != '*') {
+						// convert the string to int array
+						// sort it, similarly do for input one
+						// check if each value exist in rule
+						if (!isSubVector(BstrToStdString(rule.LocalPorts), local_port)) continue;
+					}
 				}
 
 				if ((mask & 16) != 0) {
 					// means bit - 4 is set need to check for remote ports
+					// Exception if set as IPHTTPS, option available in windows firewall
+					// @todo - deal with ^ above type of cases
+					if (rule.RemotePorts[0] != '*') {
+						if (!isSubVector(BstrToStdString(rule.RemotePorts), remote_port)) continue;
+					}
 				}
 
 				if ((mask & 32) != 0) {
 					// means bit - 5 is set need to check for protocol 
+					// @todo - so the protocol matching, maintain definations for each of
+					// protocols as integer and update code in retrieving and cheking values
 				}
 
 				if ((mask & 64) != 0) {
-					// means bit - 6 is set need to check for direction 
+					// means bit - 6 is set need to check for direction
+					if (direction != rule.Direction) continue;
 				}
 
 				if ((mask & 128) != 0) {
-					// means bit - 7 is set need to check for action 
+					// means bit - 7 is set need to check for action
+					if (action != rule.Action) continue;
 				}
 
 				
-				// Rule passed every filter hence, it should be returned back!
+				// Hurray!! Rule passed every filter hence, it should be returned back!
 				// push it to vector
 				r.push_back(GetRules(pFwRule));
             }
@@ -398,6 +397,7 @@ IP_ADDRESS IPStringtoIP(std::string ipstring) {
 	for(; i < len; i++) {
 		if (ipstring[i] == '.') status++;
 		else {
+			if (ipstring[i] > '9' || ipstring[i] < '0') break;
 			addr.value[status] = addr.value[status] * 10 + (ipstring[i] - '0');
 		}
 
@@ -406,8 +406,144 @@ IP_ADDRESS IPStringtoIP(std::string ipstring) {
 	return addr;
 }
 
-// Take input of form a.b.c1.d1-a.b.c2.d2 and return a.b.c.d/mask
-IP_ADDRESS IPRangetoIP(std::string iprange) {
-	// possible algo split on '-', get ip for both and then compute the subnet
 
+// Take input of form a.b.c1.d1-a.b.c2.d2 or  and return iprange in our struct
+IP_RANGE IPRangetoIP(std::string iprange) {
+	// possible algo split on '-', get ip for both and then compute the subnet
+	bool subnet = true;
+	int position = 0;
+
+	// check if is it of a.b.c.d/subnet mask or a.b.c.d-a1.b1.c1.d1
+	// start from 7th bit because thats the minimum possible
+	for(int i = 7; i < iprange.length(); i++) {
+		position = i;
+		if (iprange[i] == '-') {
+			subnet = false;
+			break;
+		} else if (iprange[i] == '/') {
+			break;
+		}
+	}
+
+	std::string ip1 = iprange.substr(0, position);
+	std::string ip2 = iprange.substr(position + 1);
+	IP_RANGE range;
+
+	if (subnet) {
+		range.add1 = IPStringtoIP(ip1);	
+		range.add2 = IPStringtoIP(ip2);
+		int i;
+		for(i = 0; i < 4; i++) {
+			if (range.add2.value[i] != 255) {
+				range.add2.value[i] = range.add1.value[i] + (255 - range.add2.value[i]);
+				++i;
+				break;
+			} else {
+				range.add2.value[i] = range.add1.value[i];
+				// ^ all other takes the max value by default
+			}
+		}
+		for(; i < 4; i++) range.add2.value[i] = 255;
+	} else {
+		range.add1 = IPStringtoIP(ip1);
+		range.add2 = IPStringtoIP(ip2);
+	}
+	return range;
+}
+
+
+/**
+ * Function to check if r2 lies in r1,
+ * If checking for one value keep, r2.add1 = r2.add2
+ */
+bool inRange(IP_RANGE r1, IP_RANGE r2) {
+	// r2.add1 >= r1.add1 and r1 and
+	// r2.add2 <= r1.add2
+	for(int i = 0; i < 4; i++) {
+		if (r2.add1.value[i] < r1.add1.value[i]) return false;
+	}
+
+	for(int i = 0; i < 4; i++) {
+		if (r2.add2.value[i] > r1.add2.value[i]) return false;
+	}
+
+	return true;
+}
+
+// --- Additional helper functions
+
+// convert a BSTR to a std::string. 
+std::string& BstrToStdString(const BSTR bstr, std::string& dst, int cp)
+{
+    if (!bstr)
+    {
+        // define NULL functionality. I just clear the target.
+        dst.clear();
+        return dst;
+    }
+
+    // request content length in single-chars through a terminating
+    //  nullchar in the BSTR. note: BSTR's support imbedded nullchars,
+    //  so this will only convert through the first nullchar.
+    int res = WideCharToMultiByte(cp, 0, bstr, -1, NULL, 0, NULL, NULL);
+    if (res > 0)
+    {
+        dst.resize(res);
+        WideCharToMultiByte(cp, 0, bstr, -1, &dst[0], res, NULL, NULL);
+    }
+    else
+    {    // no content. clear target
+        dst.clear();
+    }
+    return dst;
+}
+
+std::string BstrToStdString(BSTR bstr, int cp)
+{
+    std::string str;
+    BstrToStdString(bstr, str, cp);
+    return str;
+}
+
+/**
+ * Function to take ports list in string and return it as vector of integers
+ */
+vector <int> PortStringToSortedVector(std::string ports) {
+	vector <int>v;
+	int val = 0;
+	for(int i = 0; i < ports.length(); i++) {
+		if (ports[i] == ',') {
+			v.push_back(val);
+			val = 0;
+		} else {
+			if (ports[i] > '9' || ports[i] < '0') break;
+			val = val * 10 + (ports[i] - '0');
+		}
+		
+	}
+	v.push_back(val);
+	sort(v.begin(), v.end());
+	return v;
+}
+
+// code to check all port values of n exist in h
+bool isSubVector(std::string h, std::string n) {
+	vector <int> haystack = PortStringToSortedVector(h);
+	vector <int> needle = PortStringToSortedVector(n);
+	int hptr = 0, nptr = 0;
+	int hmax = haystack.size();
+	int nmax = needle.size();
+
+	while(nptr < nmax) {
+		// max limit of hptr reached
+		if (hptr == hmax) return false;
+
+		if (haystack[hptr] == needle[nptr]) {
+			hptr++;
+			nptr++;
+		} else if (haystack[hptr] < needle[nptr]){
+			hptr++;
+		} else return false;
+	}
+	return true;
 }

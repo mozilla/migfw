@@ -343,6 +343,9 @@ vector <rules> GetRulesByFilter(int mask, std::string name, std::string local_ip
 						// convert the string to int array
 						// sort it, similarly do for input one
 						// check if each value exist in rule
+						if (local_port[0] == '*') continue;
+						// ^ this will check if the requested ports include all ports
+
 						if (!isSubVector(BstrToStdString(rule.LocalPorts), local_port)) continue;
 					}
 				}
@@ -352,6 +355,7 @@ vector <rules> GetRulesByFilter(int mask, std::string name, std::string local_ip
 					// Exception if set as IPHTTPS, option available in windows firewall
 					// @todo - deal with ^ above type of cases
 					if (rule.RemotePorts[0] != '*') {
+						if (remote_port[0] == '*') continue;
 						if (!isSubVector(BstrToStdString(rule.RemotePorts), remote_port)) continue;
 					}
 				}

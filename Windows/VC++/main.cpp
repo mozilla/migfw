@@ -42,21 +42,15 @@ void DumpRule(rules r) {
 		wprintf(L" local ports: %s\n ", r.LocalPorts);
     } else wprintf(L" ICMP TypeCode: %s\n ", r.ICMP_Typecode);
 
-	wprintf(L" Direction: %s\n ", r.Direction);
-	wprintf(L" Action: %s\n ", r.Action);
+	wprintf(L" Direction: %d\n ", r.Direction);
+	wprintf(L" Action: %d\n ", r.Action);
 }
 
 void printMatchingRules(std::string s) {
-	std::vector <rules> r = GetRulesByFilter(s);
-
-	wprintf(L" No of matching rules: %d \n", r.size());
-	for(int i = 0; i < r.size(); i++) {
-		DumpRule(r[i]);
-	}
-
-	r.clear();
-	wprintf(L"\n ?????????????????? \nAttempting new function\n");
-	r = GetRulesByFilter(8, s);
+	std::vector <rules> r;
+	wprintf(L"\n ================== \nAttempting new function\n");
+	r = GetRulesByFilter(223, (string)"google", "23.22.33.22/255.255.255.250", "22.22.22.22/255.255.255.255",
+		"23,26", "22,33", 0, 0, 1);
 
 	wprintf(L" No of matching rules: %d \n", r.size());
 	for(int i = 0; i < r.size(); i++) {
@@ -64,12 +58,16 @@ void printMatchingRules(std::string s) {
 	}
 }
 
+void printIPRange(IP_RANGE r) {
+	std::cout<<"\n"<<r.add1.value[0]<<"."<<r.add1.value[1]<<"."<<r.add1.value[2]<<"."<<r.add1.value[3]<<"-";
+	std::cout<<""<<r.add2.value[0]<<"."<<r.add2.value[1]<<"."<<r.add2.value[2]<<"."<<r.add2.value[3];
+}
 
 // @todo - recieve command line arguments and use the migfw api to generate report.
 // take raw input for now, switch it to JSON based later both input and output
 int __cdecl main()
 {
-
+	
 	wprintf(L"Enter IP address you want to find rule for");
 	std::string s;
 	std::cin>>s;

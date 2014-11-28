@@ -15,6 +15,7 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <algorithm>
 
 using namespace std;
 
@@ -31,6 +32,11 @@ using namespace std;
 #define NET_FW_RULE_ENABLE_IN_NAME L"TRUE"
 #define NET_FW_RULE_DISABLE_IN_NAME L"FALSE"
 
+#define ACTION_ALLOW 1
+#define ACTION_BLOCK 0
+#define DIRECTION_IN 1
+#define DIRECTION_OUT 0
+
 // Structure to hold all information about firewall rules
 struct rules {
 	BSTR Name;
@@ -40,8 +46,8 @@ struct rules {
 	BSTR RemotePorts;
 	BSTR LocalAddress;
 	BSTR RemoteAddress;
-	BSTR Direction;
-	BSTR Action;
+	int Direction;
+	int Action;
 	BSTR InterfaceType;
 	BSTR Protocol;
 
@@ -58,9 +64,19 @@ struct IP_ADDRESS {
 	}
 };
 
+struct IP_RANGE {
+	IP_ADDRESS add1, add2;
+};
+
 // Forward declaration to helper functions
 IP_ADDRESS IPStringtoIP(std::string ipstring);
-IP_ADDRESS IPRangetoIP(std::string iprange);
+IP_RANGE IPRangetoIP(std::string iprange);
+bool inRange(IP_RANGE r1, IP_RANGE r2);
+vector <int> PortStringToSortedVector(std::string ports);
+bool isSubVector(std::string h, std::string n);
+
+std::string& BstrToStdString(const BSTR bstr, std::string& dst, int cp = CP_UTF8);
+std::string BstrToStdString(BSTR bstr, int cp = CP_UTF8);
 
 // Forward declarations for global functions
 void        DumpFWRulesInCollection(INetFwRule* FwRule);
@@ -68,7 +84,8 @@ HRESULT     WFCOMInitialize(INetFwPolicy2** ppNetFwPolicy2);
 void		cleanUp();
 bool		init();
 rules		GetRules(INetFwRule* FwRule);
-vector<rules> GetRulesByFilter(std::string ip);
-vector <rules> GetRulesByFilter(int mask, std::string ip);
+vector <rules> GetRulesByFilter(int mask, std::string name, std::string local_ip,
+								std::string remote_ip, std::string local_port,
+								std::string remote_port, int protocol, int direction, int action);
 
 #endif

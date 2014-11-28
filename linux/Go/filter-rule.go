@@ -102,6 +102,8 @@ import "os"
 import "unsafe"
 import "encoding/json"
 import "strings"
+import "strconv"
+import "regexp"
 //import "fmt"
 //import "reflect"
 
@@ -135,6 +137,7 @@ type Match struct {
 
 //
 type Rule struct {
+	Chain string
 	Src    *net.IPNet
 	Dest   *net.IPNet
 	InDev  string
@@ -150,6 +153,12 @@ type Rule struct {
 	Counter
 }
 
+type Filter struct {
+	Name string
+	Options string
+	InvFlag bool
+}
+
 var (
 	ErrorCustomChain = errors.New("Custom chains dont have counters defined :/")
 )
@@ -162,8 +171,6 @@ type IPTi interface {
 	Counter(chain string) (Counter, error)
 	Rules(chain string) []*Rule
 	Zero(chain string) error
-	FilterIP(rules []*Rule, iprange string, srcDst bool) []*Rule
-	FilterIF(rules []*Rule, interf string, inOut bool ) []*Rule
 }
 // Make a snapshot of the current iptables rules
 func NewIPT(table string) (IPTi, error) {
@@ -300,7 +307,7 @@ func (s *IPT) Rules(chain string) []*Rule {
 				marr := strings.Fields(match)
 				
 				m := new(Match)
-				m.Name = strings.TrimRight(marr[0],":")
+				m.Name = strings.ToLower(strings.TrimRight(marr[0],":"))
 				m.Options = strings.Join(marr[1:]," ")
 				c.Matches = append(c.Matches, m)
 			}
@@ -311,6 +318,8 @@ func (s *IPT) Rules(chain string) []*Rule {
 		if target != nil {
 			c.Target = C.GoString(target)
 		}
+
+		c.Chain = chain
 
 		rules = append(rules, c)
 	}
@@ -352,61 +361,187 @@ func (s *IPT) Close() error {
 	return nil
 }
 
-func (s *IPT) FilterIP(rules []*Rule, iprange string, srcDst bool ) []*Rule { // srcDst true->src false->dst
+
+// Filter Rules Functions Here
+//
+
+func FilterTarget(rule *Rule, option string, invFlag bool) bool {
+	if(rule.Target == option){
+		return (true != invFlag)
+	} 
+	return false
+}
+
+func LimitValues(options string) (int64, int64){
+	var avg, burst int64 = 0,65535
+	params := strings.Fields(options)
+	for i, param := range params{
+		if(param == "avg" && i < len(params)){
+			valueArr:=strings.Split(params[i+1],"/")
+			avg,_ = strconv.ParseInt(valueArr[0],10,64)
+			if(len(valueArr) < 2 && valueArr[1]=="min"){
+				avg *= 60
+			} else if(len(valueArr) < 2 && valueArr[1]=="hour"){
+				avg *= 3600
+			}
+		}
+		if(param == "burst" && i < len(params)){
+			burst,_ = strconv.ParseInt(params[i+1],10,64)
+		}
+	}
+	return avg, burst
+}
+
+func FilterLimit(rule *Rule, options string, invFlag bool) bool{
+	avg, burst := LimitValues(options)
+
+	for _,match := range rule.Matches {
+		if(match.Name == "limit"){
+			avgR, burstR := LimitValues(match.Options)
+			if(avgR <= avg && burstR <= burst){
+				return (true != invFlag)
+			}
+		}
+	} 
+	return false
+
+}
+
+func TcpPortRange(options string) (int64, int64, int64, int64) {
+	var smin, smax, dmin, dmax int64 = 0, 65535, 0, 65535
+
+	for _, option := range strings.Fields(options) {
+		opt := strings.Split(option,":")
+		if(opt[0]=="spts") {
+			last := len(opt) - 1;
+			min, _ := strconv.ParseInt(opt[1],10,64)
+			max, _ := strconv.ParseInt(opt[last],10,64)
+			if(smin < min ) {
+				smin = min
+			}
+			if(max < smax  && max != 0) {
+				smax = max
+			}
+		}
+		if(opt[0]=="dpts") {
+			last := len(opt) - 1;
+			min, _ := strconv.ParseInt(opt[1],10,64)
+			max, _ := strconv.ParseInt(opt[last],10,64)
+			if(dmin < min ) {
+				dmin = min
+			}
+			if(max < dmax && max != 0) {
+				dmax = max
+			}
+		}
+	}
+	return smin, smax, dmin, dmax
+}
+
+func FilterTCP(rule *Rule, options string, invFlag bool) bool {
+	smin, smax, dmin, dmax := TcpPortRange(options)
+
+	for _,match := range rule.Matches {
+		if(match.Name == "tcp"){
+			sminR, smaxR, dminR, dmaxR := TcpPortRange(match.Options)
+			if(!(smax<=sminR || smin >= smaxR) && !(dmax<=dminR || dmin >= dmaxR)){
+				return (true != invFlag)
+			}
+		}
+	} 
+	return false
+}
+
+func FilterString(rule *Rule, options string, invFlag bool) bool {
+	regex := regexp.MustCompile(options)
+
+	for _,match := range rule.Matches {
+		if(match.Name == "string"){
+			str := strings.Fields(options)
+			if(regex.MatchString(str[1])){
+				return (true != invFlag)
+			}
+		}
+	} 
+	return false
+}
+
+
+func FilterIPUtil(rule *Rule, iprange string, invFlag bool, srcDst bool ) bool { // srcDst true->src false->dst
 
 	_,ip,_ := net.ParseCIDR(iprange)
-
-	var res []*Rule;
-
-	for _, rule := range rules {
-		if(srcDst) {
-			if(rule.Src.IP.Equal(ip.IP) != rule.Not.Src) {
-				res = append(res, rule)
-			}
-		} else {
-			if(rule.Dest.IP.Equal(ip.IP) != rule.Not.Dest) {
-				res = append(res, rule)
-			}
+	if(srcDst) {
+		if(rule.Src.Contains(ip.IP) != rule.Not.Src) {
+			return (true != invFlag);
+		}
+	} else {
+		if(rule.Dest.Contains(ip.IP) != rule.Not.Dest) {
+			return (true != invFlag);
 		}
 	}
-
-	rules = res
-
-	return rules
-
+	return false
 }
-func (s *IPT) FilterIF(rules []*Rule, interf string, inOut bool ) []*Rule { // inOut true->inDev false->outDev
 
-	var res []*Rule;
+func FilterIPSrc(rule *Rule, iprange string, invFlag bool) bool {
+	return FilterIPUtil(rule, iprange, invFlag, true);
+}
 
-	for _, rule := range rules {
-		if(inOut) {
-			if last := len(rule.InDev) - 1; last >= 0 && rule.InDev[last] == '+' {
-	        	if( (rule.InDev[:last] == interf[:last]) != rule.Not.InDev) {
-					res = append(res, rule)
-				}
-			} else if( (rule.InDev == interf) != rule.Not.InDev) {
-				res = append(res, rule)
+
+func FilterIPDst(rule *Rule, iprange string, invFlag bool) bool {
+	return FilterIPUtil(rule, iprange, invFlag, false);
+}
+
+func FilterIFUtil(rule *Rule, interf string, invFlag bool, inOut bool ) bool { // inOut true->inDev false->outDev
+
+	if(inOut) {
+		if last := len(rule.InDev) - 1; last >= 0 && rule.InDev[last] == '+' {
+	    	if( (rule.InDev[:last] == interf[:last]) != rule.Not.InDev) {
+				return (true != invFlag);
 			}
-		} else {
-			if last := len(rule.OutDev) - 1; last >= 0 && rule.OutDev[last] == '+' {
-	        	if( (rule.OutDev[:last] == interf[:last]) != rule.Not.OutDev) {
-					res = append(res, rule)
-				}
-			} else if( (rule.OutDev == interf) != rule.Not.OutDev) {
-				res = append(res, rule)
+		} else if( (rule.InDev == interf) != rule.Not.InDev) {
+			return (true != invFlag);
+		}
+	} else {
+		if last := len(rule.OutDev) - 1; last >= 0 && rule.OutDev[last] == '+' {
+	    	if( (rule.OutDev[:last] == interf[:last]) != rule.Not.OutDev) {
+				return (true != invFlag);
 			}
+		} else if( (rule.OutDev == interf) != rule.Not.OutDev) {
+			return (true != invFlag);
 		}
 	}
-
-	rules = res
-
-	return rules
+	return false
 
 }
 
+func FilterIFIn(rule *Rule, interf string, invFlag bool) bool {
+	return FilterIFUtil(rule, interf, invFlag, true);
+}
+
+func FilterIFOut(rule *Rule, interf string, invFlag bool) bool {
+	return FilterIFUtil(rule, interf, invFlag, false);
+}
+
+
+func FilterRule(rule *Rule, options string, invFlag bool, f func(*Rule, string, bool) bool) bool {
+	return f(rule, options, invFlag)
+}
 
 func main() {
+
+	funcMapFilter := map[string]func(*Rule, string, bool) bool {
+		"iprange-src": FilterIPSrc,
+		"iprange-dst": FilterIPDst,
+		"interface-in": FilterIFIn,
+		"interface-out": FilterIFOut,
+        "tcp": FilterTCP,
+        "string": FilterString,
+        "limit": FilterLimit,
+        "target": FilterTarget,
+	}
+
+	var ft = []Filter{{"tcp","spts:600:50000",false}}
+
 
 	ipt, err := NewIPT("filter")
 
@@ -416,21 +551,25 @@ func main() {
 
 	chains := ipt.Chains()
 	for _,chain := range chains {
-		if(!ipt.IsBuiltinChain(chain)) {
-			continue;
-		}
-	
+		
 		rules := ipt.Rules(chain)
-
-
-		rules = ipt.FilterIP(rules, "192.168.128.25/20", true)
-		rules = ipt.FilterIP(rules, "192.168.128.25/20", false)
-		rules  = ipt.FilterIF(rules, "eth0", true)
-		rules  = ipt.FilterIF(rules, "eth1", false)
-
-		byt, _ := json.Marshal(rules)
-
+		var res []*Rule
+		
+		for _, rule := range rules {
+			flag := true
+			for _, filter := range ft{
+				if(!FilterRule(rule, filter.Options, filter.InvFlag, funcMapFilter[filter.Name])){
+					flag = false
+					break
+				}
+			}
+			if(flag){
+				res = append(res, rule)
+			}
+		}
 			
+		byt, _ := json.Marshal(res)
+
 		var out bytes.Buffer
 		json.Indent(&out, byt, "=", "\t")
 		out.WriteTo(os.Stdout)

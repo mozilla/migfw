@@ -168,7 +168,7 @@ type IPTi interface {
 	IsBuiltinChain(string) bool
 	Chains() []string
 	Close() error
-	Counter(chain string) (Counter, error)
+	Countder(chain string) (Counter, error)
 	Rules(chain string) []*Rule
 	Zero(chain string) error
 }
@@ -540,7 +540,7 @@ func main() {
         "target": FilterTarget,
 	}
 
-	var ft = []Filter{{"tcp","spts:600:50000",false}}
+	var ft = []Filter{{"tcp","spts:0:80",false}}
 
 
 	ipt, err := NewIPT("filter")

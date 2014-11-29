@@ -3,8 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <libiptc/libiptc.h>
-#include "linux/netfilter/xt_limit.h"
-#include "linux/netfilter/xt_physdev.h"
+// #include "linux/netfilter/xt_limit.h"
+// #include "linux/netfilter/xt_physdev.h"
+#include <xtables.h>
 #include <netinet/in.h>
 
 struct details_write {

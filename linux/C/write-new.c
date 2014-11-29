@@ -1,0 +1,146 @@
+#include <stdio.h>
+#include <sys/errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <error.h>
+#include <libiptc/libiptc.h>
+#include <libiptc/libip6tc.h>
+#include <linux/netfilter/xt_tcpudp.h>
+#include <xtables.h>
+
+#define dbg(A) printf("%s %d\n",#A,(A) );
+#define dbgs(A) printf("%s %s\n",#A,(A) );
+
+
+static struct xtables_rule_match *matches = NULL;
+
+void pushMatch(struct xtables_rule_match **headref, struct xtables_match *m) {
+	struct xtables_rule_match *temp = (struct xtables_rule_match *) malloc(sizeof(struct xtables_rule_match));
+	dbg(sizeof(m));
+	temp->next = *headref;
+	temp->match = m;
+	*headref = temp;
+	dbgs((*headref)->match->m->u.user.name);
+}
+
+void tcp_set(int smin, int smax, int dmin, int dmax) {
+	
+	struct xtables_match *match = xtables_find_match("tcp", XTF_LOAD_MUST_SUCCEED, NULL);
+	printf("match->m size = %d\n", sizeof(match->m));
+	match->m = (struct xt_entry_match *) malloc(XT_ALIGN(sizeof(struct xt_entry_match)) + match->size);
+	match->m->u.match_size = XT_ALIGN(sizeof(struct xt_entry_match)) + match->size;
+	dbg(match->m->u.match_size);
+	strcpy(match->m->u.user.name, "tcp");
+	struct xt_tcp *tcpinfo = (struct xt_tcp *) match->m->data;
+
+	tcpinfo->spts[0] = smin;dbg(tcpinfo->spts[0]);
+	tcpinfo->spts[1] = smax;dbg(tcpinfo->spts[1]);
+	tcpinfo->dpts[0] = dmin;dbg(tcpinfo->dpts[0]);
+	tcpinfo->dpts[1] = dmax;dbg(tcpinfo->dpts[1]);
+
+	pushMatch(&matches, match);
+
+}
+
+static struct ipt_entry * generate_entry( struct xtables_rule_match *matches, struct xt_standard_target *target) {
+	unsigned int size;
+	struct xtables_rule_match *matchp;
+	static struct ipt_entry *e;
+
+	size = sizeof(struct ipt_entry);
+	for (matchp = matches; matchp; matchp = matchp->next)
+		size += matchp->match->m->u.match_size;
+	// e = xtables_malloc(size + target->target.u.target_size);
+	// xtables_malloc returns an allocated void *
+	e = calloc(1,size + target->target.u.target_size);
+	// e = calloc(1, sizeof(struct ipt_entry));
+	e->ip.src.s_addr = inet_addr("172.145.1.3");
+	e->ip.smsk.s_addr= inet_addr("255.255.255.255");
+	e->ip.dst.s_addr = inet_addr("168.220.1.9");
+	e->ip.dmsk.s_addr= inet_addr("255.255.255.255");
+	e->ip.invflags |= IPT_INV_SRCIP;
+    e->ip.proto = IPPROTO_TCP;
+	strcpy(e->ip.iniface, "eth0");
+    e->nfcache = 0;
+
+
+	e->target_offset = size;
+	e->next_offset = size + target->target.u.target_size;
+
+	size = 0;
+	for (matchp = matches; matchp; matchp = matchp->next) {
+		memcpy(e->elems + size, matchp->match->m, matchp->match->m->u.match_size);
+		size += matchp->match->m->u.match_size;
+	}
+
+	memcpy(e->elems + size, target, target->target.u.target_size);
+	// char *p = e->elems;
+ //    int n;
+ //    for (n = 0; n < 100; ++n)
+ //    {
+ //        printf("%x\n", *p);
+ //        ++p;
+ //    }
+
+ //    printf("\t");
+
+	return e;
+}
+
+
+int main(){
+	xtables_init();
+	xtables_set_nfproto(NFPROTO_IPV4);
+
+
+	tcp_set(0,890,67,678);
+	// tcp_set(0,890,67,678);
+	/*tcp_set(0,890,0,678);
+	tcp_set(67,3434,67,678);
+	tcp_set(0,890,2367,56678);*/
+
+	struct ipt_entry *e;
+	// e = calloc(1, sizeof(struct ipt_entry));
+	// e->ip.src.s_addr = inet_addr("172.145.1.3");
+	// e->ip.smsk.s_addr= inet_addr("255.255.255.255");
+	// e->ip.dst.s_addr = inet_addr("168.220.1.9");
+	// e->ip.dmsk.s_addr= inet_addr("255.255.255.255");
+	// e->ip.invflags |= IPT_INV_SRCIP;
+	// strcpy(e->ip.iniface, "eth0");
+
+    struct xt_standard_target *target = (struct xt_standard_target *)malloc(sizeof(struct xt_standard_target));
+    target->target.u.target_size = sizeof(struct xt_standard_target);
+    strcpy(target->target.u.user.name, "ACCEPT");
+	
+	e = generate_entry(matches, target);
+
+
+	struct xtc_handle *h;
+    const ipt_chainlabel chain = "INPUT";
+    const char * tablename = "filter";
+	h = iptc_init(tablename);
+    if ( !h )
+    {
+            printf("Error initializing: %s\n", iptc_strerror(errno));
+            exit(errno);
+    }
+
+    //analogous to “iptables -A INPUT” part of our desirable rule + the rule itself
+    //inside of the e struct
+    int x = iptc_append_entry(chain, e, h);
+    if (!x)
+    {
+            printf("Error append_entry: %s\n", iptc_strerror(errno));
+            exit(errno);
+    }
+
+    int y = iptc_commit(h);
+    if (!y)
+    {
+            printf("Error commit: %s\n", iptc_strerror(errno));
+            exit(errno);
+    }
+
+	return 0;
+}

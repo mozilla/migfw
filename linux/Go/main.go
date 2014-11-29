@@ -1,11 +1,7 @@
 package main
 
 import "fmt"
-
-// #cgo LDFLAGS: -liptc
-// #cgo LDFLAGS: -lip4tc
-// #cgo LDFLAGS: -lip6tc
-// #cgo LDFLAGS: -ldl
+// #cgo pkg-config: libiptc
 // #include "../C/migfw_helper.h"
 import "C"
 
@@ -27,7 +23,7 @@ func main() {
 	// VARIABLE DECLARATIONS //
 	// chain := "INPUT"
 	tablename := "filter"
-	ip := ip_details {"158.145.1.3","255.255.255.255","168.220.1.9","255.255.255.255","eth0"}
+	ip := ip_details {"152.145.1.3","255.255.255.255","168.220.1.9","255.255.255.255","eth0"}
 	proto := protocol {"tcp", [2]int{0,80}, [2]int{0,51201}}
 	jump := "ACCEPT"
 	// VARIABLE DECLARATIONS //
@@ -50,5 +46,5 @@ func main() {
 	detail.jump = C.CString(jump)
 	// fmt.Println(detail)
 	ret_val := C.write_rule(&detail)
-	fmt.Println(ret_val)
+	fmt.Println(uint(ret_val)==0)
 }

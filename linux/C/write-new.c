@@ -67,8 +67,7 @@ void limit_set(int avg,int burst)
 	struct xt_rateinfo *rateinfo=(struct xt_rateinfo *) match->m->data;
 	rateinfo->avg = avg;
 	rateinfo->burst = burst;
-    
-    pushMatch(&matches,match);
+	pushMatch(&matches,match);
 }
 
 void physdev_set(const char physindev[IFNAMSIZ],const char physoutdev[IFNAMSIZ], __u8 bitmask)
@@ -129,9 +128,9 @@ int main(){
 
 	struct ipt_entry *e;
 
-    struct xt_standard_target *target = (struct xt_standard_target *)malloc(sizeof(struct xt_standard_target));
+	struct xt_standard_target *target = (struct xt_standard_target *)malloc(sizeof(struct xt_standard_target));
     target->target.u.target_size = sizeof(struct xt_standard_target);
-    strcpy(target->target.u.user.name, "ACCEPT");
+	strcpy(target->target.u.user.name, "ACCEPT");
 	
 	struct ipt_ip ipdetails;
 
@@ -149,30 +148,30 @@ int main(){
 	e = generate_entry(ipdetails, matches, target);
 
 	struct xtc_handle *h;
-    const ipt_chainlabel chain = "INPUT";
-    const char * tablename = "filter";
+	const ipt_chainlabel chain = "INPUT";
+	const char * tablename = "filter";
 	h = iptc_init(tablename);
-    if ( !h )
-    {
-            printf("Error initializing: %s\n", iptc_strerror(errno));
-            exit(errno);
-    }
+	if ( !h )
+	{
+		printf("Error initializing: %s\n", iptc_strerror(errno));
+		exit(errno);
+	}
 
-    //analogous to “iptables -A INPUT” part of our desirable rule + the rule itself
-    //inside of the e struct
-    int x = iptc_append_entry(chain, e, h);
-    if (!x)
-    {
-            printf("Error append_entry: %s\n", iptc_strerror(errno));
-            exit(errno);
-    }
+	//analogous to “iptables -A INPUT” part of our desirable rule + the rule itself
+	//inside of the e struct
+	int x = iptc_append_entry(chain, e, h);
+	if (!x)
+	{
+		printf("Error append_entry: %s\n", iptc_strerror(errno));
+		exit(errno);
+	}
 
-    int y = iptc_commit(h);
-    if (!y)
-    {
-            printf("Error commit: %s\n", iptc_strerror(errno));
-            exit(errno);
-    }
+	int y = iptc_commit(h);
+	if (!y)
+	{
+		printf("Error commit: %s\n", iptc_strerror(errno));
+		exit(errno);
+	}
 
 	return 0;
 }

@@ -19,10 +19,10 @@ long fwRuleCount;
 
 /**
  * Function to retrieve the the firewall rules, and update global variables
- * @param: void
+ * @param: read (bool) - true for read rule, false for write rule
  * @return: bool - true for successful init else false;
  */
-bool init() {
+bool init(bool read) {
 	// Initialize COM.
     hrComInit = CoInitializeEx(
                     0,
@@ -68,13 +68,15 @@ bool init() {
 		return false;
     }
     
-    // Iterate through all of the rules in pFwRules
-	pFwRules->get__NewEnum(&pEnumerator);
+	if (read) {
+		// Iterate through all of the rules in pFwRules
+		pFwRules->get__NewEnum(&pEnumerator);
 
-    if(pEnumerator)
-    {
-        hr = pEnumerator->QueryInterface(__uuidof(IEnumVARIANT), (void **) &pVariant);
-    }
+		if(pEnumerator)
+		{
+			hr = pEnumerator->QueryInterface(__uuidof(IEnumVARIANT), (void **) &pVariant);
+		}
+	}
 	return true;
 }
 
@@ -241,8 +243,8 @@ rules GetRules(INetFwRule* FwRule) {
  * @param: string Name - substring of the firewall rule
  */
 vector <rules> GetRulesByFilter(int mask, std::string name, std::string local_ip,
-								std::string remote_ip, std::string local_port,
-								std::string remote_port, int protocol, int direction, int action) {
+							std::string remote_ip, std::string local_port,
+							std::string remote_port, int protocol, int direction, int action) {
 	vector <rules> r;
 
 	// Initialize COM and ...
@@ -388,6 +390,148 @@ vector <rules> GetRulesByFilter(int mask, std::string name, std::string local_ip
 	return r;
 }
 
+/**
+ * Function to add a rule to windows firewall (Needs admin access)
+ * parameters similar as above function @todo - copy the param info here
+ */
+bool createRule(int mask, std::string name, std::string local_ip,
+				std::string remote_ip, std::string local_port,
+				std::string remote_port, int protocol, int direction, int action,
+				bool enable) {
+	// Initialize COM and ...
+	// Retrieve all firewall rules to pfrules object (global)
+	if (!init()) {
+		// initialize failed
+		// @todo - someway convey that method failed - change current method
+		cout<<"Create Rule - init() failed\n";
+		return false;
+	}
+
+	BSTR bstrRuleName = stringToBSTR(name);
+	BSTR bstrRuleLocal_ip = stringToBSTR(local_ip);
+	BSTR bstrRuleRemote_ip = stringToBSTR(remote_ip);
+	BSTR bstrRuleLocal_port = stringToBSTR(local_port);
+	BSTR bstrRuleRemote_port = stringToBSTR(remote_port);
+
+
+    // ICMP Echo Request
+    //BSTR bstrICMPTypeCode = SysAllocString(L"8:*");
+
+	// Create a new Firewall Rule object.
+    hr = CoCreateInstance(
+                __uuidof(NetFwRule),
+                NULL,
+                CLSCTX_INPROC_SERVER,
+                __uuidof(INetFwRule),
+                (void**)&pFwRule);
+    if (FAILED(hr))
+    {
+        printf("CoCreateInstance for Firewall Rule failed: 0x%08lx\n", hr);
+    }
+	
+	// Populate the Firewall Rule object
+	if ((mask & 1) != 0) {
+		// name
+	    pFwRule->put_Name(bstrRuleName);
+	}
+	if ((mask & 2) != 0) {
+		// local address
+		pFwRule->put_LocalAddresses(bstrRuleLocal_ip);
+	}
+	if ((mask & 4) != 0) {
+		// remote address
+		pFwRule->put_RemoteAddresses(bstrRuleRemote_ip);
+	}
+	if ((mask & 8) != 0) {
+		// local ports
+		// @todo - ports not getting set in write rule
+		pFwRule->put_LocalPorts(bstrRuleLocal_port);
+	}
+	if ((mask & 16) != 0) {
+		// remote ports
+		// @todo - ports not getting set in write rule
+		pFwRule->put_RemotePorts(bstrRuleRemote_port);
+	}
+	if ((mask & 32) != 0) {
+		// protocol, @todo - can add more protocols
+		switch (protocol)
+		{
+		case 1: pFwRule->put_Protocol(1); break;
+		case 2: pFwRule->put_Protocol(2); break;
+		case 6: pFwRule->put_Protocol(NET_FW_IP_PROTOCOL_TCP); break;
+		case 17: pFwRule->put_Protocol(NET_FW_IP_PROTOCOL_UDP); break;
+
+		default:
+			break;
+		}
+		//pFwRule->put_IcmpTypesAndCodes(bstrICMPTypeCode); // @todo <-- take care of this
+	}
+	if ((mask & 64) != 0) {
+		if (direction == 0) pFwRule->put_Direction(NET_FW_RULE_DIR_OUT);
+		else pFwRule->put_Direction(NET_FW_RULE_DIR_IN);
+	}
+	if ((mask & 128) != 0) {
+		if (action == 0) pFwRule->put_Action(NET_FW_ACTION_BLOCK);
+		else pFwRule->put_Action(NET_FW_ACTION_ALLOW);
+	}
+
+	if (enable) pFwRule->put_Enabled(VARIANT_TRUE);
+	else pFwRule->put_Enabled(VARIANT_FALSE);
+
+    // Add the Firewall Rule
+    hr = pFwRules->Add(pFwRule);
+    if (FAILED(hr))
+    {
+        printf("Firewall Rule Add failed: 0x%08lx\n", hr);
+        goto Cleanup;
+    }
+
+Cleanup:
+
+    // Free BSTR's
+    SysFreeString(bstrRuleName);
+	SysFreeString(bstrRuleLocal_ip);
+	SysFreeString(bstrRuleRemote_ip);
+	SysFreeString(bstrRuleLocal_port);
+	SysFreeString(bstrRuleRemote_port);
+
+    //SysFreeString(bstrICMPTypeCode);
+
+    // Release the INetFwRule object
+    if (pFwRule != NULL)
+    {
+        pFwRule->Release();
+    }
+
+    // Release the INetFwRules object
+    if (pFwRules != NULL)
+    {
+        pFwRules->Release();
+    }
+
+    // Release the INetFwPolicy2 object
+    if (pNetFwPolicy2 != NULL)
+    {
+        pNetFwPolicy2->Release();
+    }
+
+    // Uninitialize COM.
+    if (SUCCEEDED(hrComInit))
+    {
+        CoUninitialize();
+    }
+
+	return !FAILED(hr);
+}
+
+/**
+ * Function to take vector of rules as input and return JSON o/p
+ */
+std::string vectorToJSON(vector <rules> r) {
+	std::string json = "{}";
+
+	return json;
+}
 
 // ----- helper functions ----------
 
@@ -509,8 +653,17 @@ std::string BstrToStdString(BSTR bstr, int cp)
     return str;
 }
 
+// covert std::string to BSTR
+inline BSTR stringToBSTR(std::string s) {
+	std::wstring ws;
+	ws.assign(s.begin(), s.end());
+	BSTR ret = SysAllocStringLen(ws.data(), ws.size());
+	return ret;
+}
+
 /**
  * Function to take ports list in string and return it as vector of integers
+ * @todo, ports can have values like a-b as well take care of such cases #urgent
  */
 vector <int> PortStringToSortedVector(std::string ports) {
 	vector <int>v;

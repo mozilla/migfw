@@ -24,6 +24,7 @@ using namespace std;
 // ----------------------------------------------------
 // Temporary function for current debugging purposes
 // Alter when this code will be served as library
+// ----------------------------------------------------
 
 // Function to print the properties of rules structure passed
 // as an argument, to console
@@ -42,38 +43,35 @@ void DumpRule(rules r) {
 		wprintf(L" local ports: %s\n ", r.LocalPorts);
     } else wprintf(L" ICMP TypeCode: %s\n ", r.ICMP_Typecode);
 
-	wprintf(L" Direction: %d\n ", r.Direction);
-	wprintf(L" Action: %d\n ", r.Action);
+	wprintf(L" Direction: %s\n ", (r.Direction == 1)?L"IN":L"OUT");
+	wprintf(L" Action: %s\n ", r.Action == 1 ? L"ALLOW" : L"BLOCK");
 }
 
-void printMatchingRules(std::string s) {
-	std::vector <rules> r;
-	wprintf(L"\n ================== \nAttempting new function\n");
-	r = GetRulesByFilter(223, (string)"google", "23.22.33.22/255.255.255.250", "22.22.22.22/255.255.255.255",
-		"23,26", "22,33", 0, 0, 1);
 
-	wprintf(L" No of matching rules: %d \n", r.size());
-	for(int i = 0; i < r.size(); i++) {
-		DumpRule(r[i]);
-	}
-}
-
-void printIPRange(IP_RANGE r) {
-	std::cout<<"\n"<<r.add1.value[0]<<"."<<r.add1.value[1]<<"."<<r.add1.value[2]<<"."<<r.add1.value[3]<<"-";
-	std::cout<<""<<r.add2.value[0]<<"."<<r.add2.value[1]<<"."<<r.add2.value[2]<<"."<<r.add2.value[3];
-}
 
 // @todo - recieve command line arguments and use the migfw api to generate report.
 // take raw input for now, switch it to JSON based later both input and output
 int __cdecl main()
 {
-	
-	wprintf(L"Enter IP address you want to find rule for");
-	std::string s;
-	std::cin>>s;
-	std::cout<<"Attempting for "<<s<<"\n";
+	// Testing read rule API
+	std::vector <rules> r;
+	r = GetRulesByFilter(223, (string)"google", "23.22.33.22/255.255.255.250", "22.22.22.22/255.255.255.255",
+		"23", "22,33", 0, 0, 1);
 
-	printMatchingRules(s);
+	wprintf(L" No of matching rules: %d \n", r.size());
+	for(int i = 0; i < r.size(); i++) {
+		DumpRule(r[i]);
+	}
+
+	// Testing write rule API
+	cout<<"-------------------------------\n";
+	cout<<"Write rule"<<endl;
+	if (createRule(255, "TEST_FW_WRITE_RULE", "192.168.100.1/255.255.255.255",
+				"23.22.12.0/255.255.255.0", "23",
+				"25", 17, 0, 1, true)) {
+		cout<<"SUCCESS"<<endl;
+	} else cout<<"FAILED"<<endl;
+
 
 	getchar();
 	getchar();

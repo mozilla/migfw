@@ -69,23 +69,30 @@ struct IP_RANGE {
 };
 
 // Forward declaration to helper functions
-IP_ADDRESS IPStringtoIP(std::string ipstring);
-IP_RANGE IPRangetoIP(std::string iprange);
-bool inRange(IP_RANGE r1, IP_RANGE r2);
-vector <int> PortStringToSortedVector(std::string ports);
-bool isSubVector(std::string h, std::string n);
+IP_ADDRESS		IPStringtoIP(std::string ipstring);
+IP_RANGE		IPRangetoIP(std::string iprange);
+bool			inRange(IP_RANGE r1, IP_RANGE r2);
+vector <int>	PortStringToSortedVector(std::string ports);
+bool			isSubVector(std::string h, std::string n);
 
-std::string& BstrToStdString(const BSTR bstr, std::string& dst, int cp = CP_UTF8);
-std::string BstrToStdString(BSTR bstr, int cp = CP_UTF8);
+std::string&	BstrToStdString(const BSTR bstr, std::string& dst, int cp = CP_UTF8);
+std::string		BstrToStdString(BSTR bstr, int cp = CP_UTF8);
+inline BSTR		stringToBSTR(std::string s);
 
 // Forward declarations for global functions
-void        DumpFWRulesInCollection(INetFwRule* FwRule);
-HRESULT     WFCOMInitialize(INetFwPolicy2** ppNetFwPolicy2);
-void		cleanUp();
-bool		init();
-rules		GetRules(INetFwRule* FwRule);
-vector <rules> GetRulesByFilter(int mask, std::string name, std::string local_ip,
-								std::string remote_ip, std::string local_port,
-								std::string remote_port, int protocol, int direction, int action);
+void			DumpFWRulesInCollection(INetFwRule* FwRule);
+HRESULT			WFCOMInitialize(INetFwPolicy2** ppNetFwPolicy2);
+void			cleanUp();
+bool			init(bool read = true);
+rules			GetRules(INetFwRule* FwRule);
+vector <rules>	GetRulesByFilter(int mask, std::string name, std::string local_ip,
+						std::string remote_ip, std::string local_port,
+						std::string remote_port, int protocol, int direction, int action);
+std::string		vectorToJSON(vector <rules> r);
+
+bool createRule(int mask, std::string name, std::string local_ip,
+				std::string remote_ip, std::string local_port,
+				std::string remote_port, int protocol, int direction, int action,
+				bool enable = true);
 
 #endif

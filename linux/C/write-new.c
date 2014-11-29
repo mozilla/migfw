@@ -135,11 +135,11 @@ int main(){
 	struct ipt_ip ipdetails;
 
 	// some assignments for the entry
-	ipdetails.src.s_addr = inet_addr("45.145.1.0");
+	ipdetails.src.s_addr = inet_addr("145.145.1.0");
 	ipdetails.smsk.s_addr= inet_addr("255.255.255.0");
 	ipdetails.dst.s_addr = inet_addr("168.220.1.9");
 	ipdetails.dmsk.s_addr= inet_addr("255.255.255.255");
-	ipdetails.invflags = 1|IPT_INV_SRCIP;
+	ipdetails.invflags = IPT_INV_SRCIP;
 	ipdetails.proto = IPPROTO_TCP;
 	strcpy(ipdetails.iniface, "eth0");
 

@@ -240,11 +240,10 @@ rules GetRules(INetFwRule* FwRule) {
  *		bit-0: Name, bit-1: local Address, bit-2: remote addr, bit-3: local port
  *		bit-4: remote port, bit-5: protocol, bit-6: direction, bit-7: Action
  *		mask = 0, means no filter rules, enumerate all rules
- * @param: string Name - substring of the firewall rule
  */
 vector <rules> GetRulesByFilter(int mask, std::string name, std::string local_ip,
 							std::string remote_ip, std::string local_port,
-							std::string remote_port, int protocol, int direction, int action) {
+							std::string remote_port, long int protocol, int direction, int action) {
 	vector <rules> r;
 
 	// Initialize COM and ...
@@ -366,6 +365,7 @@ vector <rules> GetRulesByFilter(int mask, std::string name, std::string local_ip
 					// means bit - 5 is set need to check for protocol 
 					// @todo - so the protocol matching, maintain definations for each of
 					// protocols as integer and update code in retrieving and cheking values
+					if (protocol != rule.Lval) continue;
 				}
 
 				if ((mask & 64) != 0) {
@@ -392,7 +392,11 @@ vector <rules> GetRulesByFilter(int mask, std::string name, std::string local_ip
 
 /**
  * Function to add a rule to windows firewall (Needs admin access)
- * parameters similar as above function @todo - copy the param info here
+ * @param: mask (int) - each bit represent which all filter
+ *		conditions are active, ex 0010110, means those with one need to be checked.
+ *		bit-0: Name, bit-1: local Address, bit-2: remote addr, bit-3: local port
+ *		bit-4: remote port, bit-5: protocol, bit-6: direction, bit-7: Action
+ *		mask = 0, means no filter rules, then return;
  */
 bool createRule(int mask, std::string name, std::string local_ip,
 				std::string remote_ip, std::string local_port,
@@ -406,6 +410,8 @@ bool createRule(int mask, std::string name, std::string local_ip,
 		cout<<"Create Rule - init() failed\n";
 		return false;
 	}
+
+	if (mask == 0) return false;
 
 	BSTR bstrRuleName = stringToBSTR(name);
 	BSTR bstrRuleLocal_ip = stringToBSTR(local_ip);
@@ -456,8 +462,8 @@ bool createRule(int mask, std::string name, std::string local_ip,
 		// protocol, @todo - can add more protocols
 		switch (protocol)
 		{
-		case 1: pFwRule->put_Protocol(1); break;
-		case 2: pFwRule->put_Protocol(2); break;
+		case 1: pFwRule->put_Protocol(1); break;	// ICMP @todo - check for extra stuffs
+		case 2: pFwRule->put_Protocol(2); break;	// IGMP
 		case 6: pFwRule->put_Protocol(NET_FW_IP_PROTOCOL_TCP); break;
 		case 17: pFwRule->put_Protocol(NET_FW_IP_PROTOCOL_UDP); break;
 
@@ -663,14 +669,28 @@ inline BSTR stringToBSTR(std::string s) {
 
 /**
  * Function to take ports list in string and return it as vector of integers
- * @todo, ports can have values like a-b as well take care of such cases #urgent
  */
 vector <int> PortStringToSortedVector(std::string ports) {
 	vector <int>v;
 	int val = 0;
+
+	bool isRange = false;
+	int rangeStart = 0;
+
 	for(int i = 0; i < ports.length(); i++) {
+		if (ports[i] == '-') {
+			rangeStart = val;
+			val = 0;
+			isRange = true;
+		}
 		if (ports[i] == ',') {
-			v.push_back(val);
+			if (isRange) {
+				for(int j = rangeStart; j <= val; j++) v.push_back(j);
+				isRange = false;
+				rangeStart = 0;
+			} else {
+				v.push_back(val);
+			}
 			val = 0;
 		} else {
 			if (ports[i] > '9' || ports[i] < '0') break;

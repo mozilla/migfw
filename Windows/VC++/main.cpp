@@ -18,33 +18,39 @@ Abstract:
 #include <string>
 #include <iostream>
 #include <vector>
+#include "jsoncons/json.hpp"
 
 using namespace std;
+using namespace jsoncons;
 
-// ----------------------------------------------------
-// Temporary function for current debugging purposes
-// Alter when this code will be served as library
-// ----------------------------------------------------
+// print json output for all resulting rules
+void DumpRule(std::vector <rules> r) {
+	json fwrules(json::an_array);
+	for(int i = 0; i < r.size(); i++) {
+		json obj;
+		obj["name"] = BstrToStdString(r[i].Name);
+		obj["description"] = BstrToStdString(r[i].Description);
+		obj["application"] = BstrToStdString(r[i].ApplicationName);
+		obj["local_addr"] = BstrToStdString(r[i].LocalAddress);
+		obj["remote_addr"] = BstrToStdString(r[i].RemoteAddress);
+		obj["local_port"] = BstrToStdString(r[i].LocalPorts);
+		obj["remote_port"] = BstrToStdString(r[i].RemotePorts);
+		/*obj["protocol"] = r.Protocol;*/
 
-// Function to print the properties of rules structure passed
-// as an argument, to console
-void DumpRule(rules r) {
-	wprintf(L" -------------------------------------------\n ");
-	wprintf(L" Name: %s\n ", r.Name);
-	wprintf(L" Description: %s\n ", r.Description);
-	
-	wprintf(L" Application Name: %s\n ", r.ApplicationName);
-	wprintf(L" local address: %s\n ", r.LocalAddress);
-	wprintf(L" remote address: %s\n ", r.RemoteAddress);
-	wprintf(L" IP Protocol: %s\n ", r.Protocol);
-	
+		if (r[i].Direction == 1) obj["direction"] = "IN";
+		else  obj["direction"] = "OUT";
+
+		if (r[i].Action == 1) obj["action"] = "ALLOW";
+		else  obj["action"] = "BLOCK";
+		fwrules.add(obj);
+	}
+	cout<<pretty_print(fwrules)<<endl;
+	/*
 	if(r.Lval != NET_FW_IP_VERSION_V4 && r.Lval != NET_FW_IP_VERSION_V6) {
 		wprintf(L" remote ports: %s\n ", r.RemotePorts);
 		wprintf(L" local ports: %s\n ", r.LocalPorts);
     } else wprintf(L" ICMP TypeCode: %s\n ", r.ICMP_Typecode);
-
-	wprintf(L" Direction: %s\n ", (r.Direction == 1)?L"IN":L"OUT");
-	wprintf(L" Action: %s\n ", r.Action == 1 ? L"ALLOW" : L"BLOCK");
+	*/
 }
 
 
@@ -58,10 +64,8 @@ int __cdecl main()
 	r = GetRulesByFilter(223, (string)"google", "23.22.33.22/255.255.255.250", "22.22.22.22/255.255.255.255",
 		"23", "22,33", 0, 0, 1);
 
-	wprintf(L" No of matching rules: %d \n", r.size());
-	for(int i = 0; i < r.size(); i++) {
-		DumpRule(r[i]);
-	}
+	wprintf(L"GENERAL DATA:\nNo of matching rules: %d \nJSON:\n", r.size());
+	DumpRule(r);
 
 	// Testing write rule API
 	cout<<"-------------------------------\n";

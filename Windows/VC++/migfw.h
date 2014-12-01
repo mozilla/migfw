@@ -87,7 +87,7 @@ bool			init(bool read = true);
 rules			GetRules(INetFwRule* FwRule);
 vector <rules>	GetRulesByFilter(int mask, std::string name, std::string local_ip,
 						std::string remote_ip, std::string local_port,
-						std::string remote_port, int protocol, int direction, int action);
+						std::string remote_port, long int protocol, int direction, int action);
 std::string		vectorToJSON(vector <rules> r);
 
 bool createRule(int mask, std::string name, std::string local_ip,

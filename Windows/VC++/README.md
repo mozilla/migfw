@@ -29,3 +29,21 @@ GetRulesByFilter(223, "google", "23.22.33.22/255.255.255.250",
 
 ```
 Where first parameter is used for masking the filters, as `223` = `011011111` so those values with bit set are checked for filters and others are ignored. Such parameters can be sent as an empty string!
+
+###OUTPUT FORMAT
+```
+[
+    {
+        "action":"ALLOW",
+        "application":"",
+        "description":"this is a test rule for migfw",
+        "direction":"OUT",
+        "local_addr":"22.22.2.22/255.255.255.255,23.22.33.0/255.255.255.0"
+,
+        "local_port":"23,25,11,33-44",
+        "name":"google",
+        "remote_addr":"22.22.22.22/255.255.255.255,33.33.33.33/255.255.255.255,55.22.22.0/255.255.255.0",
+        "remote_port":"*"
+    }
+]
+```

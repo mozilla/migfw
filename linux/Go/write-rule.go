@@ -211,6 +211,7 @@ import "net"
 import "unsafe"
 // import "encoding/json"
 import "strings"
+import "strconv"
 //import "reflect"
 
 /**
@@ -379,10 +380,10 @@ func (s *IPT) Close() error {
 	return nil
 }
 
-func (m IPMask) String() string {
+func GetMaskString(m IPMask)string {
 	s := ""
 	for i, value := range m.ip {
-		s+= Itoa(int(value))
+		s+= strconv.Itoa(int(value))
 		if(i < len(m)-1){
 			s+="."
 		}
@@ -509,12 +510,12 @@ func main() {
 		if(filter.Name == "iprange-src"){
 			_,src,_ := net.ParseCIDR(filter.Options)
 			SrcIp = src.Ip.String()
-			SrcMask = src.Mask.String()
+			SrcMask = GetMaskString(src.Mask)
 		}
 		if(filter.Name == "iprange-dst") {
 			_,dst,_ := net.ParseCIDR(filter.Options)
 			DstIp = dst.Ip.String()
-			DstMask = dst.Mask.String()	
+			DstMask = GetMaskString(dst.Mask)	
 		} 
 		if(filter.Name == "interface-in") {
 			InDev = filter.Options

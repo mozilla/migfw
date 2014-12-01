@@ -26,8 +26,8 @@ struct ipt_ip assign_ip_details(struct ipt_ip ipdetails)
 	ipdet.smsk.s_addr= ipdetails.smsk.s_addr;// inet_addr("255.255.255.255");
 	ipdet.dst.s_addr = ipdetails.dst.s_addr;//inet_addr("168.220.1.9");
 	ipdet.dmsk.s_addr= ipdetails.dmsk.s_addr;//inet_addr("255.255.255.255");
-	//ipdet.invflags = ipdetails.invflags;//IPT_INV_SRCIP;
-	//ipdet.proto = ipdetails.proto;//IPPROTO_TCP;
+	ipdet.invflags = ipdetails.invflags;//IPT_INV_SRCIP;
+	ipdet.proto = ipdetails.proto;//IPPROTO_TCP;
 	strcpy(ipdet.iniface,ipdetails.iniface);
 	return ipdet;
 }
@@ -65,7 +65,7 @@ void tcp_set(int smin, int smax, int dmin, int dmax) {
 
 void limit_set(int avg,int burst)
 {
-	avg /= 400;
+	// avg /= 400;
 	struct xtables_match *match = xtables_find_match("limit", XTF_LOAD_MUST_SUCCEED, NULL);
 	match->m = (struct xt_entry_match *) malloc(XT_ALIGN(sizeof(struct xt_entry_match)) + match->size);
 	match->m->u.match_size = XT_ALIGN(sizeof(struct xt_entry_match)) + match->size;
@@ -95,7 +95,7 @@ void physdev_set(const char physindev[IFNAMSIZ],const char physoutdev[IFNAMSIZ],
 }
 
 void string_set(const char *pattern, const char *algo) {
-	struct xtables_match *match = xtables_find_match("physdev", XTF_LOAD_MUST_SUCCEED, NULL);
+	struct xtables_match *match = xtables_find_match("string", XTF_LOAD_MUST_SUCCEED, NULL);
 	match->m = (struct xt_entry_match *) malloc(XT_ALIGN(sizeof(struct xt_entry_match)) + match->size);
 	match->m->u.match_size = XT_ALIGN(sizeof(struct xt_entry_match)) + match->size;
 
@@ -127,7 +127,6 @@ static struct ipt_entry * generate_entry( struct ipt_ip ipdetails, struct xtable
 	// xtables_malloc returns an allocated void *
 
 	e = calloc(1,size + target->target.u.target_size);
-
 	e->ip = assign_ip_details(ipdetails);
 	
 	e->nfcache = 0;
@@ -141,7 +140,7 @@ static struct ipt_entry * generate_entry( struct ipt_ip ipdetails, struct xtable
 	}
 
 	memcpy(e->elems + size, target, target->target.u.target_size);
-
+	
 	return e;
 }
 
@@ -161,14 +160,13 @@ struct ipt_entry * CreateRuleIPv4(char *srcip, char *srcmask, char *dstip, char 
 	ipdetails.smsk.s_addr= inet_addr(srcmask);
 	ipdetails.dst.s_addr = inet_addr(dstip);
 	ipdetails.dmsk.s_addr= inet_addr(dstmask);
-	//ipdetails.invflags = IPT_INV_SRCIP;
-	//ipdetails.proto = IPPROTO_TCP;
+	ipdetails.invflags = IPT_INV_SRCIP;
+	ipdetails.proto = IPPROTO_TCP;
 	strcpy(ipdetails.iniface, indev);
 
 	// assignments over
 
 	e = generate_entry(ipdetails, matches, target);
-	
 
 	// bring this code to GO --->
 
@@ -190,7 +188,6 @@ struct ipt_entry * CreateRuleIPv4(char *srcip, char *srcmask, char *dstip, char 
 		printf("Error append_entry: %s\n", iptc_strerror(errno));
 		exit(errno);
 	}
-
 	int y = iptc_commit(h);
 	if (!y)
 	{
@@ -201,12 +198,9 @@ struct ipt_entry * CreateRuleIPv4(char *srcip, char *srcmask, char *dstip, char 
 
 	return e;
 }
-
-
-
-
 */
 import "C"
+import "fmt"
 import "net"
 import "unsafe"
 import "strings"
@@ -329,6 +323,7 @@ func TcpPortRange(options string) (int64, int64, int64, int64) {
 			}
 		}
 	}
+	// fmt.Printf("%d %d %d %d\n",smin,smax,dmin,dmax);
 	return smin, smax, dmin, dmax
 }
 
@@ -342,7 +337,7 @@ func LimitValues(options string) (int64, int64){
 	params := strings.Fields(options)
 	for i, param := range params{
 		if(param == "avg" && i < len(params)){
-			valueArr:=strings.Split(params[i+1],"/")
+			valueArr := strings.Split(params[i+1],"/")
 			avg,_ = strconv.ParseInt(valueArr[0],10,64)
 			if(len(valueArr) < 2 && valueArr[1]=="min"){
 				avg *= 60
@@ -366,7 +361,7 @@ func MatchLimit(options string) {
 func MatchString(options string) {
 	option := strings.Fields(options)
 	pattern := ""
-	algo := "RBK"
+	algo := "kmp"
 	for i, value := range option{
 		if(value == "match") {
 			pattern = strings.Trim(option[i+1], "\"")
@@ -375,6 +370,7 @@ func MatchString(options string) {
 			algo = option[i+1]	
 		}
 	}
+	// fmt.Printf("%s %s",pattern,algo);
 	C.string_set(C.CString(pattern), C.CString(algo))
 }
 
@@ -389,7 +385,7 @@ func main() {
         "limit": MatchLimit,
 	}
 
-	var ft = []Filter{{"tcp","spts:600:500",false}}
+	var ft = []Filter{{"tcp","spts:600:500",false},{"limit","avg 5/hr burst 10",false}}
 	/*ipt, err := NewIPT("filter")
 
 	if (err != nil) {

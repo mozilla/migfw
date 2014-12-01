@@ -168,7 +168,7 @@ type IPTi interface {
 	IsBuiltinChain(string) bool
 	Chains() []string
 	Close() error
-	Countder(chain string) (Counter, error)
+	Counter(chain string) (Counter, error)
 	Rules(chain string) []*Rule
 	Zero(chain string) error
 }

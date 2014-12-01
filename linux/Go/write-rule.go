@@ -34,11 +34,10 @@ struct ipt_ip assign_ip_details(struct ipt_ip ipdetails)
 
 void pushMatch(struct xtables_rule_match **headref, struct xtables_match *m) {
 	struct xtables_rule_match *temp = (struct xtables_rule_match *) malloc(sizeof(struct xtables_rule_match));
-	dbg(sizeof(m));
 	temp->next = *headref;
 	temp->match = m;
 	*headref = temp;
-	dbgs((*headref)->match->m->u.user.name);
+	//dbgs((*headref)->match->m->u.user.name);
 }
 
 void tcp_set(int smin, int smax, int dmin, int dmax) {
@@ -46,14 +45,14 @@ void tcp_set(int smin, int smax, int dmin, int dmax) {
 	struct xtables_match *match = xtables_find_match("tcp", XTF_LOAD_MUST_SUCCEED, NULL);
 	match->m = (struct xt_entry_match *) malloc(XT_ALIGN(sizeof(struct xt_entry_match)) + match->size);
 	match->m->u.match_size = XT_ALIGN(sizeof(struct xt_entry_match)) + match->size;
-	dbg(match->m->u.match_size);
+	//dbg(match->m->u.match_size);
 	strcpy(match->m->u.user.name, "tcp");
 	struct xt_tcp *tcpinfo = (struct xt_tcp *) match->m->data;
 
-	tcpinfo->spts[0] = smin;dbg(tcpinfo->spts[0]);
-	tcpinfo->spts[1] = smax;dbg(tcpinfo->spts[1]);
-	tcpinfo->dpts[0] = dmin;dbg(tcpinfo->dpts[0]);
-	tcpinfo->dpts[1] = dmax;dbg(tcpinfo->dpts[1]);
+	tcpinfo->spts[0] = smin;//dbg(tcpinfo->spts[0]);
+	tcpinfo->spts[1] = smax;//dbg(tcpinfo->spts[1]);
+	tcpinfo->dpts[0] = dmin;//dbg(tcpinfo->dpts[0]);
+	tcpinfo->dpts[1] = dmax;//dbg(tcpinfo->dpts[1]);
 
 	pushMatch(&matches, match);
 
@@ -65,7 +64,7 @@ void limit_set(int avg,int burst)
 	struct xtables_match *match = xtables_find_match("limit", XTF_LOAD_MUST_SUCCEED, NULL);
 	match->m = (struct xt_entry_match *) malloc(XT_ALIGN(sizeof(struct xt_entry_match)) + match->size);
 	match->m->u.match_size = XT_ALIGN(sizeof(struct xt_entry_match)) + match->size;
-	dbg(match->m->u.match_size);
+	//dbg(match->m->u.match_size);
 	strcpy(match->m->u.user.name, "limit");
 	struct xt_rateinfo *rateinfo=(struct xt_rateinfo *) match->m->data;
 	rateinfo->avg = avg;
@@ -79,7 +78,7 @@ void physdev_set(const char physindev[IFNAMSIZ],const char physoutdev[IFNAMSIZ],
 	struct xtables_match *match = xtables_find_match("physdev", XTF_LOAD_MUST_SUCCEED, NULL);
 	match->m = (struct xt_entry_match *) malloc(XT_ALIGN(sizeof(struct xt_entry_match)) + match->size);
 	match->m->u.match_size = XT_ALIGN(sizeof(struct xt_entry_match)) + match->size;
-	dbg(match->m->u.match_size);
+	//dbg(match->m->u.match_size);
 	strcpy(match->m->u.user.name, "physdev");
 	struct xt_physdev_info * physdevinfo;
 	physdevinfo = (struct xt_physdev_info *)match->m->data;
@@ -97,14 +96,14 @@ void string_set(const char *pattern, const char *algo) {
 
 	strcpy(match->m->u.user.name, "string");
 
-	struct xt_string_info *info = (struct xt_string_info *) m->data;
+	struct xt_string_info *info = (struct xt_string_info *) match->m->data;
 	info->to_offset = UINT16_MAX;
 	if (strlen(pattern) <= XT_STRING_MAX_PATTERN_SIZE) {
-		strncpy(info->pattern, s, XT_STRING_MAX_PATTERN_SIZE);
-		info->patlen = strnlen(s, XT_STRING_MAX_PATTERN_SIZE);
+		strncpy(info->pattern, pattern, XT_STRING_MAX_PATTERN_SIZE);
+		info->patlen = strnlen(pattern, XT_STRING_MAX_PATTERN_SIZE);
 	}
 	if (strlen(algo) <= XT_STRING_MAX_ALGO_NAME_SIZE) {
-		strncpy(info->algo, s, XT_STRING_MAX_ALGO_NAME_SIZE);
+		strncpy(info->algo, algo, XT_STRING_MAX_ALGO_NAME_SIZE);
 	}
 
 	pushMatch(&matches,match);
@@ -204,13 +203,13 @@ struct ipt_entry * CreateRuleIPv4(char *srcip, char *srcmask, char *dstip, char 
 
 */
 import "C"
-import "errors"
-import "fmt"
+// import "errors"
+// import "fmt"
 import "net"
-import "bytes"
-import "os"
+// import "bytes"
+// import "os"
 import "unsafe"
-import "encoding/json"
+// import "encoding/json"
 import "strings"
 //import "reflect"
 
@@ -256,95 +255,95 @@ func NewIPT(table string) (IPTi, error) {
 }
 
 
-func (s *IPT) Rules(chain string) []*Rule {
-	if s.h == nil {
-		panic("trying to use libiptc handle after Close()")
-	}
+// func (s *IPT) Rules(chain string) []*Rule {
+// 	if s.h == nil {
+// 		panic("trying to use libiptc handle after Close()")
+// 	}
 
-	cname := C.CString(chain)
-	defer C.free(unsafe.Pointer(cname))
+// 	cname := C.CString(chain)
+// 	defer C.free(unsafe.Pointer(cname))
 
-	rules := make([]*Rule, 0)
+// 	rules := make([]*Rule, 0)
 
-	for r := C.iptc_first_rule(cname, s.h); r != nil; r = C.iptc_next_rule(r, s.h) {
-		c := new(Rule)
+// 	for r := C.iptc_first_rule(cname, s.h); r != nil; r = C.iptc_next_rule(r, s.h) {
+// 		c := new(Rule)
 
-		// read counters
-		c.Packets = uint64(r.counters.pcnt)
-		c.Bytes = uint64(r.counters.bcnt)
+// 		// read counters
+// 		c.Packets = uint64(r.counters.pcnt)
+// 		c.Bytes = uint64(r.counters.bcnt)
 
-		// read network interfaces
-		c.InDev = C.GoString(&r.ip.iniface[0])
-		c.OutDev = C.GoString(&r.ip.outiface[0])
-		if r.ip.invflags&C.IPT_INV_VIA_IN != 0 {
-			c.Not.InDev = true
-		}
-		if r.ip.invflags&C.IPT_INV_VIA_OUT != 0 {
-			c.Not.OutDev = true
-		}
+// 		// read network interfaces
+// 		c.InDev = C.GoString(&r.ip.iniface[0])
+// 		c.OutDev = C.GoString(&r.ip.outiface[0])
+// 		if r.ip.invflags&C.IPT_INV_VIA_IN != 0 {
+// 			c.Not.InDev = true
+// 		}
+// 		if r.ip.invflags&C.IPT_INV_VIA_OUT != 0 {
+// 			c.Not.OutDev = true
+// 		}
 
-		// read source ip and mask
-		src := uint32(r.ip.src.s_addr)
-		c.Src = new(net.IPNet)
-		c.Src.IP = net.IPv4(byte(src&0xff),
-							byte((src>>8)&0xff),
-							byte((src>>16)&0xff),
-							byte((src>>24)&0xff))
-		mask := uint32(r.ip.smsk.s_addr)
-		c.Src.Mask = net.IPv4Mask(byte(mask&0xff),
-								byte((mask>>8)&0xff),
-								byte((mask>>16)&0xff),
-								byte((mask>>24)&0xff))
-		if r.ip.invflags&C.IPT_INV_SRCIP != 0 {
-			c.Not.Src = true
-		}
+// 		// read source ip and mask
+// 		src := uint32(r.ip.src.s_addr)
+// 		c.Src = new(net.IPNet)
+// 		c.Src.IP = net.IPv4(byte(src&0xff),
+// 							byte((src>>8)&0xff),
+// 							byte((src>>16)&0xff),
+// 							byte((src>>24)&0xff))
+// 		mask := uint32(r.ip.smsk.s_addr)
+// 		c.Src.Mask = net.IPv4Mask(byte(mask&0xff),
+// 								byte((mask>>8)&0xff),
+// 								byte((mask>>16)&0xff),
+// 								byte((mask>>24)&0xff))
+// 		if r.ip.invflags&C.IPT_INV_SRCIP != 0 {
+// 			c.Not.Src = true
+// 		}
 
-		// read destination ip and mask
-		dest := uint32(r.ip.dst.s_addr)
-		c.Dest = new(net.IPNet)
-		c.Dest.IP = net.IPv4(byte(dest&0xff),
-							byte((dest>>8)&0xff),
-							byte((dest>>16)&0xff),
-							byte((dest>>24)&0xff))
-		mask = uint32(r.ip.dmsk.s_addr)
-		c.Dest.Mask = net.IPv4Mask(byte(mask&0xff),
-								byte((mask>>8)&0xff),
-								byte((mask>>16)&0xff),
-								byte((mask>>24)&0xff))
-		if r.ip.invflags&C.IPT_INV_DSTIP != 0 {
-			c.Not.Dest = true
-		}
-		//read match 
+// 		// read destination ip and mask
+// 		dest := uint32(r.ip.dst.s_addr)
+// 		c.Dest = new(net.IPNet)
+// 		c.Dest.IP = net.IPv4(byte(dest&0xff),
+// 							byte((dest>>8)&0xff),
+// 							byte((dest>>16)&0xff),
+// 							byte((dest>>24)&0xff))
+// 		mask = uint32(r.ip.dmsk.s_addr)
+// 		c.Dest.Mask = net.IPv4Mask(byte(mask&0xff),
+// 								byte((mask>>8)&0xff),
+// 								byte((mask>>16)&0xff),
+// 								byte((mask>>24)&0xff))
+// 		if r.ip.invflags&C.IPT_INV_DSTIP != 0 {
+// 			c.Not.Dest = true
+// 		}
+// 		//read match 
 
-		target_offset := int(r.target_offset)
-		if(target_offset > 0) {
-			for i := uint64(C.getSizeIptEntry()); int(i) < target_offset ;{
-				i = uint64 (C.match_iterate_wrapper_ipv4(r, C.uint(i)))
-				match := C.GoString(&C.buf[0])
-				match = strings.Trim(match, " ")
+// 		target_offset := int(r.target_offset)
+// 		if(target_offset > 0) {
+// 			for i := uint64(C.getSizeIptEntry()); int(i) < target_offset ;{
+// 				i = uint64 (C.match_iterate_wrapper_ipv4(r, C.uint(i)))
+// 				match := C.GoString(&C.buf[0])
+// 				match = strings.Trim(match, " ")
 
-				marr := strings.Fields(match)
+// 				marr := strings.Fields(match)
 				
-				m := new(Match)
-				m.Name = strings.ToLower(strings.TrimRight(marr[0],":"))
-				m.Options = strings.Join(marr[1:]," ")
-				c.Matches = append(c.Matches, m)
-			}
-		}
+// 				m := new(Match)
+// 				m.Name = strings.ToLower(strings.TrimRight(marr[0],":"))
+// 				m.Options = strings.Join(marr[1:]," ")
+// 				c.Matches = append(c.Matches, m)
+// 			}
+// 		}
 
-		// read target
-		target := C.iptc_get_target(r, s.h)
-		if target != nil {
-			c.Target = C.GoString(target)
-		}
+// 		// read target
+// 		target := C.iptc_get_target(r, s.h)
+// 		if target != nil {
+// 			c.Target = C.GoString(target)
+// 		}
 
-		c.Chain = chain
+// 		c.Chain = chain
 
-		rules = append(rules, c)
-	}
+// 		rules = append(rules, c)
+// 	}
 
-	return rules
-}
+// 	return rules
+// }
 
 func (s *IPT) Zero(chain string) error {
 	if s.h == nil {
@@ -382,7 +381,7 @@ func (s *IPT) Close() error {
 
 func (m IPMask) String() string {
 	s := ""
-	for i, value := range m{
+	for i, value := range m.ip {
 		s+= Itoa(int(value))
 		if(i < len(m)-1){
 			s+="."
@@ -425,7 +424,7 @@ func TcpPortRange(options string) (int64, int64, int64, int64) {
 
 func MatchTCP(options string) {
 	smin, smax, dmin, dmax := TcpPortRange(options)
-	C.tcp_set(C.uint(smin), C.unit(smin), C.uint(dmin), C.uint(dmax))
+	C.tcp_set(C.uint(smin), C.uint(smin), C.uint(dmin), C.uint(dmax))
 }
 
 func LimitValues(options string) (int64, int64){
@@ -450,12 +449,12 @@ func LimitValues(options string) (int64, int64){
 
 func MatchLimit(options string) {
 	avg, burst := LimitValues(options)
-	C.limit_set(C.uint(avg), C.unit(burst))
+	C.limit_set(C.uint(avg), C.uint(burst))
 }
 
 func MatchTCP(options string) {
 	smin, smax, dmin, dmax := TcpPortRange(options)
-	C.tcp_set(C.uint(smin), C.unit(smin), C.uint(dmin), C.uint(dmax))
+	C.tcp_set(C.uint(smin), C.uint(smin), C.uint(dmin), C.uint(dmax))
 }
 
 func MatchString(options string) {
@@ -478,7 +477,7 @@ func InsertMatch(options string, f func(string)){
 	f(options)
 }
 func main() {
-    funcMapMatch := map[string]func(string){}
+    funcMapMatch := map[string]func(string){
         "tcp": MatchTCP,
         "string": MatchString,
         "limit": MatchLimit,
@@ -501,8 +500,8 @@ func main() {
 
 	InDev := ""
 	InDevInvFlag := false
-	InDev := ""
-	InDevInvFlag := false
+	OutDev := ""
+	OutDevInvFlag := false
 
 	Target := "ACCEPT"
 

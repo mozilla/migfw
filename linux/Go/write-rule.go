@@ -26,10 +26,16 @@ struct ipt_ip assign_ip_details(struct ipt_ip ipdetails)
 	ipdet.smsk.s_addr= ipdetails.smsk.s_addr;// inet_addr("255.255.255.255");
 	ipdet.dst.s_addr = ipdetails.dst.s_addr;//inet_addr("168.220.1.9");
 	ipdet.dmsk.s_addr= ipdetails.dmsk.s_addr;//inet_addr("255.255.255.255");
-	ipdet.invflags = ipdetails.invflags;//IPT_INV_SRCIP;
-	ipdet.proto = ipdetails.proto;//IPPROTO_TCP;
+	//ipdet.invflags = ipdetails.invflags;//IPT_INV_SRCIP;
+	//ipdet.proto = ipdetails.proto;//IPPROTO_TCP;
 	strcpy(ipdet.iniface,ipdetails.iniface);
 	return ipdet;
+}
+
+void initIPv4() {
+	xtables_init();
+	xtables_set_nfproto(NFPROTO_IPV4);
+
 }
 
 void pushMatch(struct xtables_rule_match **headref, struct xtables_match *m) {
@@ -53,7 +59,6 @@ void tcp_set(int smin, int smax, int dmin, int dmax) {
 	tcpinfo->spts[1] = smax;//dbg(tcpinfo->spts[1]);
 	tcpinfo->dpts[0] = dmin;//dbg(tcpinfo->dpts[0]);
 	tcpinfo->dpts[1] = dmax;//dbg(tcpinfo->dpts[1]);
-
 	pushMatch(&matches, match);
 
 }
@@ -141,8 +146,7 @@ static struct ipt_entry * generate_entry( struct ipt_ip ipdetails, struct xtable
 }
 
 struct ipt_entry * CreateRuleIPv4(char *srcip, char *srcmask, char *dstip, char *dstmask, char *indev, char *outdev, char *tt){
-	xtables_init();
-	xtables_set_nfproto(NFPROTO_IPV4);
+	
 
 	struct ipt_entry *e;
 
@@ -203,16 +207,11 @@ struct ipt_entry * CreateRuleIPv4(char *srcip, char *srcmask, char *dstip, char 
 
 */
 import "C"
-// import "errors"
-// import "fmt"
 import "net"
-// import "bytes"
-// import "os"
 import "unsafe"
-// import "encoding/json"
 import "strings"
 import "strconv"
-//import "reflect"
+//import "fmt"
 
 /**
  * Declaration of structures and interfaces
@@ -256,96 +255,6 @@ func NewIPT(table string) (IPTi, error) {
 }
 
 
-// func (s *IPT) Rules(chain string) []*Rule {
-// 	if s.h == nil {
-// 		panic("trying to use libiptc handle after Close()")
-// 	}
-
-// 	cname := C.CString(chain)
-// 	defer C.free(unsafe.Pointer(cname))
-
-// 	rules := make([]*Rule, 0)
-
-// 	for r := C.iptc_first_rule(cname, s.h); r != nil; r = C.iptc_next_rule(r, s.h) {
-// 		c := new(Rule)
-
-// 		// read counters
-// 		c.Packets = uint64(r.counters.pcnt)
-// 		c.Bytes = uint64(r.counters.bcnt)
-
-// 		// read network interfaces
-// 		c.InDev = C.GoString(&r.ip.iniface[0])
-// 		c.OutDev = C.GoString(&r.ip.outiface[0])
-// 		if r.ip.invflags&C.IPT_INV_VIA_IN != 0 {
-// 			c.Not.InDev = true
-// 		}
-// 		if r.ip.invflags&C.IPT_INV_VIA_OUT != 0 {
-// 			c.Not.OutDev = true
-// 		}
-
-// 		// read source ip and mask
-// 		src := uint32(r.ip.src.s_addr)
-// 		c.Src = new(net.IPNet)
-// 		c.Src.IP = net.IPv4(byte(src&0xff),
-// 							byte((src>>8)&0xff),
-// 							byte((src>>16)&0xff),
-// 							byte((src>>24)&0xff))
-// 		mask := uint32(r.ip.smsk.s_addr)
-// 		c.Src.Mask = net.IPv4Mask(byte(mask&0xff),
-// 								byte((mask>>8)&0xff),
-// 								byte((mask>>16)&0xff),
-// 								byte((mask>>24)&0xff))
-// 		if r.ip.invflags&C.IPT_INV_SRCIP != 0 {
-// 			c.Not.Src = true
-// 		}
-
-// 		// read destination ip and mask
-// 		dest := uint32(r.ip.dst.s_addr)
-// 		c.Dest = new(net.IPNet)
-// 		c.Dest.IP = net.IPv4(byte(dest&0xff),
-// 							byte((dest>>8)&0xff),
-// 							byte((dest>>16)&0xff),
-// 							byte((dest>>24)&0xff))
-// 		mask = uint32(r.ip.dmsk.s_addr)
-// 		c.Dest.Mask = net.IPv4Mask(byte(mask&0xff),
-// 								byte((mask>>8)&0xff),
-// 								byte((mask>>16)&0xff),
-// 								byte((mask>>24)&0xff))
-// 		if r.ip.invflags&C.IPT_INV_DSTIP != 0 {
-// 			c.Not.Dest = true
-// 		}
-// 		//read match 
-
-// 		target_offset := int(r.target_offset)
-// 		if(target_offset > 0) {
-// 			for i := uint64(C.getSizeIptEntry()); int(i) < target_offset ;{
-// 				i = uint64 (C.match_iterate_wrapper_ipv4(r, C.uint(i)))
-// 				match := C.GoString(&C.buf[0])
-// 				match = strings.Trim(match, " ")
-
-// 				marr := strings.Fields(match)
-				
-// 				m := new(Match)
-// 				m.Name = strings.ToLower(strings.TrimRight(marr[0],":"))
-// 				m.Options = strings.Join(marr[1:]," ")
-// 				c.Matches = append(c.Matches, m)
-// 			}
-// 		}
-
-// 		// read target
-// 		target := C.iptc_get_target(r, s.h)
-// 		if target != nil {
-// 			c.Target = C.GoString(target)
-// 		}
-
-// 		c.Chain = chain
-
-// 		rules = append(rules, c)
-// 	}
-
-// 	return rules
-// }
-
 func (s *IPT) Zero(chain string) error {
 	if s.h == nil {
 		panic("trying to use libiptc handle after Close()")
@@ -380,9 +289,9 @@ func (s *IPT) Close() error {
 	return nil
 }
 
-func GetMaskString(m IPMask)string {
+func GetMaskString(m net.IPMask)string {
 	s := ""
-	for i, value := range m.ip {
+	for i, value := range m {
 		s+= strconv.Itoa(int(value))
 		if(i < len(m)-1){
 			s+="."
@@ -425,7 +334,7 @@ func TcpPortRange(options string) (int64, int64, int64, int64) {
 
 func MatchTCP(options string) {
 	smin, smax, dmin, dmax := TcpPortRange(options)
-	C.tcp_set(C.uint(smin), C.uint(smin), C.uint(dmin), C.uint(dmax))
+	C.tcp_set(C.int(smin), C.int(smax), C.int(dmin), C.int(dmax))
 }
 
 func LimitValues(options string) (int64, int64){
@@ -450,13 +359,9 @@ func LimitValues(options string) (int64, int64){
 
 func MatchLimit(options string) {
 	avg, burst := LimitValues(options)
-	C.limit_set(C.uint(avg), C.uint(burst))
+	C.limit_set(C.int(avg), C.int(burst))
 }
 
-func MatchTCP(options string) {
-	smin, smax, dmin, dmax := TcpPortRange(options)
-	C.tcp_set(C.uint(smin), C.uint(smin), C.uint(dmin), C.uint(dmax))
-}
 
 func MatchString(options string) {
 	option := strings.Fields(options)
@@ -484,37 +389,38 @@ func main() {
         "limit": MatchLimit,
 	}
 
-	var ft = []Filter{{"tcp","spts:600:50000",false}}
-	ipt, err := NewIPT("filter")
+	var ft = []Filter{{"tcp","spts:600:500",false}}
+	/*ipt, err := NewIPT("filter")
 
 	if (err != nil) {
 		panic("Error occured initializing filter table")
-	}
+	}*/
 
 	SrcIp := "0.0.0.0"
 	SrcMask := "0.0.0.0"
-	SrcInvFlag := false
+	//SrcInvFlag := false
 	
 	DstIp := "0.0.0.0"
 	DstMask := "0.0.0.0"
-	DstInvFlag := false
+	//DstInvFlag := false
 
 	InDev := ""
-	InDevInvFlag := false
+	//InDevInvFlag := false
 	OutDev := ""
-	OutDevInvFlag := false
+	//OutDevInvFlag := false
 
 	Target := "ACCEPT"
 
+	C.initIPv4()
 	for _, filter := range ft{
 		if(filter.Name == "iprange-src"){
 			_,src,_ := net.ParseCIDR(filter.Options)
-			SrcIp = src.Ip.String()
+			SrcIp = src.IP.String()
 			SrcMask = GetMaskString(src.Mask)
 		}
 		if(filter.Name == "iprange-dst") {
 			_,dst,_ := net.ParseCIDR(filter.Options)
-			DstIp = dst.Ip.String()
+			DstIp = dst.IP.String()
 			DstMask = GetMaskString(dst.Mask)	
 		} 
 		if(filter.Name == "interface-in") {
@@ -527,8 +433,9 @@ func main() {
 			Target = filter.Options
 		} 
 
-		InsertMatch(filter.options, funcMapMatch[filter.Name]);
+		InsertMatch(filter.Options, funcMapMatch[filter.Name]);
 	}
 
-	r:= C.CreateRuleIPv4(SrcIp, SrcMask, DstIp, DstMask, InDev, OutDev, Target)
+	C.CreateRuleIPv4(C.CString(SrcIp), C.CString(SrcMask), C.CString(DstIp), C.CString(DstMask), C.CString(InDev), C.CString(OutDev), C.CString(Target)) 
+
 }

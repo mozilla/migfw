@@ -17,8 +17,8 @@ package main
 char buf[150];
 
 void print_match_ipv4(struct xt_entry_match *m,struct ipt_ip *ip, int numeric, char *buf) {
-	int fds[2];
-  	pipe(fds);
+	int fds[2],a;
+  	a = pipe(fds);
 
   	if(!fork()) { //child element
   		close(fds[0]);
@@ -39,7 +39,7 @@ void print_match_ipv4(struct xt_entry_match *m,struct ipt_ip *ip, int numeric, c
 	}
 	else {
 		close(fds[1]);
-  		read(fds[0],buf,150);
+  		a=read(fds[0],buf,150);
 	}
     
 }
@@ -57,8 +57,8 @@ int getSizeIptEntry() {
 
 
 void print_match_ipv6(struct xt_entry_match *m,struct ip6t_ip6 *ip, int numeric, char *buf) {
-	int fds[2];
-  	pipe(fds);
+	int fds[2],a;
+  	a=pipe(fds);
 
   	if(!fork()) { //child element
   		close(fds[0]);
@@ -79,7 +79,7 @@ void print_match_ipv6(struct xt_entry_match *m,struct ip6t_ip6 *ip, int numeric,
 	}
 	else {
 		close(fds[1]);
-  		read(fds[0],buf,150);
+  		a=read(fds[0],buf,150);
 	}
     
 }

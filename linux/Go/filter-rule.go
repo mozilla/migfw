@@ -1,6 +1,7 @@
 package main
 
 /*
+#cgo CFLAGS: -Wno-error
 #cgo pkg-config: libiptc
 #cgo pkg-config: xtables
 #include <stdio.h>
@@ -540,7 +541,7 @@ func main() {
         "target": FilterTarget,
 	}
 
-	var ft = []Filter{{"tcp","spts:0:80",false}}
+	var ft = []Filter{{"tcp","spts:300:400",false}}
 
 
 	ipt, err := NewIPT("filter")

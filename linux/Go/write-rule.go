@@ -160,7 +160,7 @@ struct ipt_entry * CreateRuleIPv4(char *srcip, char *srcmask, char *dstip, char 
 	ipdetails.smsk.s_addr= inet_addr(srcmask);
 	ipdetails.dst.s_addr = inet_addr(dstip);
 	ipdetails.dmsk.s_addr= inet_addr(dstmask);
-	ipdetails.invflags = IPT_INV_SRCIP;
+	ipdetails.invflags = 0;
 	ipdetails.proto = IPPROTO_TCP;
 	strcpy(ipdetails.iniface, indev);
 
@@ -200,12 +200,11 @@ struct ipt_entry * CreateRuleIPv4(char *srcip, char *srcmask, char *dstip, char 
 }
 */
 import "C"
-import "fmt"
+// import "fmt"
 import "net"
 import "unsafe"
 import "strings"
 import "strconv"
-//import "fmt"
 
 /**
  * Declaration of structures and interfaces
@@ -385,19 +384,19 @@ func main() {
         "limit": MatchLimit,
 	}
 
-	var ft = []Filter{{"tcp","spts:600:500",false},{"limit","avg 5/hr burst 10",false}}
+	var ft = []Filter{{"tcp","spts:300:350 dpts:0:100",false},{"limit","avg 5/hr burst 10",false}}
 	/*ipt, err := NewIPT("filter")
 
 	if (err != nil) {
 		panic("Error occured initializing filter table")
 	}*/
 
-	SrcIp := "0.0.0.0"
-	SrcMask := "0.0.0.0"
+	SrcIp := "192.168.100.12"
+	SrcMask := "255.255.255.255"
 	//SrcInvFlag := false
 	
-	DstIp := "0.0.0.0"
-	DstMask := "0.0.0.0"
+	DstIp := "192.168.100.13"
+	DstMask := "255.255.255.255"
 	//DstInvFlag := false
 
 	InDev := ""
